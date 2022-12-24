@@ -21,4 +21,4 @@ export plot_smooths
 export predict
 export summary
 
-end # module
+end
