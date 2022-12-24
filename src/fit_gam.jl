@@ -22,7 +22,7 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, likelihood::Union{S
     spline_basis = [zeros(size(X, 1), 1) for i in 1:n_features]
 
     if knots === nothing
-        knots = Vector{Float64}(undef, n_features)
+        knots = Vector{Vector{Float64}}(undef, n_features)
         n_knots = Vector{Int}(undef, n_features)
         for i in 1:n_features
             knots[i], _ = optimal_knots(X[:, i], degree, min(n_samples, 50))
