@@ -5,14 +5,14 @@ using Random, Distributions, RDatasets, Plots
 # Get mtcars data
 
 mtcars = dataset("datasets", "mtcars")
-X = mtcars[:, [:am, :cyl, :wt, :hp]]
-y = mtcars[:, :mpg]
+X = Matrix(mtcars[:, [:AM, :Cyl, :WT, :HP]])
+y = mtcars[:, :MPG]
 
 @testset "GAM.jl" begin
 
     # Fit GAM
 
-    model = fit_gam(X, y, likelihood = :gaussian)
+    model = fit_gam(X, y, :gaussian)
     @test model isa GAM
 
     # Return summary of GAM

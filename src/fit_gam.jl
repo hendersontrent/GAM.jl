@@ -1,4 +1,4 @@
-struct GAM
+struct GAMModel
     beta::Vector{Float64}
     knots::Vector{Vector{Float64}}
     degree::Int
@@ -10,7 +10,7 @@ struct GAM
     bic::Float64
 end
 
-function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothing, Vector{Vector{Float64}}}, degree::Int = 3, n_knots::Union{Nothing, Vector{Int}}, likelihood::Union{Symbol, Function}, alpha::Union{Nothing, Float64}, n_folds::Int = 5)
+function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, likelihood::Union{Symbol, Function}, knots::Union{Nothing, Vector{Vector{Float64}}}=nothing, degree::Int=3, n_knots::Union{Nothing, Vector{Int}}=nothing, alpha::Union{Nothing, Float64}=nothing, n_folds::Int=5)
 
     # Add a column of ones to X for the intercept term
 
@@ -22,7 +22,7 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
     spline_basis = [zeros(size(X, 1), 1) for i in 1:n_features]
 
     if knots === nothing
-        knots = Vector{Vector{Float64}}(undef, n_features)
+        knots = Vector{Float64}(undef, n_features)
         n_knots = Vector{Int}(undef, n_features)
         for i in 1:n_features
             knots[i], _ = optimal_knots(X[:, i], degree, min(n_samples, 50))
@@ -117,7 +117,7 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
 
     # Create the model object
 
-    model = GAM(beta, knots, degree, n_knots, likelihood, alpha, log_lik, aic, bic)
+    model = GAMModel(beta, knots, degree, n_knots, likelihood, alpha, log_lik, aic, bic)
 
     return model
 end

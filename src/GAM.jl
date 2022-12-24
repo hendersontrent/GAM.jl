@@ -13,7 +13,7 @@ include("summary.jl")
 export pen_log_lik
 export cv_log_lik
 export optimal_knots
-export GAM
+export GAMModel
 export fit_gam
 export plot_gam
 export predict_gam
