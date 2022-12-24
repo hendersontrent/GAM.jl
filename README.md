@@ -1,5 +1,5 @@
 # GAM.jl
-Julia package for fitting and evaluating generalized additive models (GAMs)
+Julia package for fitting, evaluating, and visualising generalised additive models (GAMs)
 
 ## Motivation
 
