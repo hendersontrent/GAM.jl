@@ -10,7 +10,7 @@ struct GAM
     bic::Float64
 end
 
-function build_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothing, Vector{Vector{Float64}}}, degree::Int, n_knots::Union{Nothing, Vector{Int}}, likelihood::Union{Symbol, Function}, alpha::Union{Nothing, Float64}, n_folds::Int)
+function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothing, Vector{Vector{Float64}}}, degree::Int = 3, n_knots::Union{Nothing, Vector{Int}}, likelihood::Union{Symbol, Function}, alpha::Union{Nothing, Float64}, n_folds::Int = 5)
 
     # Add a column of ones to X for the intercept term
 
@@ -116,7 +116,7 @@ function build_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Noth
     bic = -2 * log_lik + n_params * log(length(y))
 
     # Create the model object
-    
+
     model = GAM(beta, knots, degree, n_knots, likelihood, alpha, log_lik, aic, bic)
 
     return model

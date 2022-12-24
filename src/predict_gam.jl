@@ -1,4 +1,4 @@
-function predict(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
+function predict_gam(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
 
     # Extract the model coefficients and knots
 

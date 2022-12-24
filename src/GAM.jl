@@ -5,20 +5,18 @@ using LinearAlgebra, Distributions, BSplines, Optim, StatsBase, Plots, DataFrame
 include("pen_log_lik.jl")
 include("cv_log_lik.jl")
 include("optimal_knots.jl")
-include("FitGAM.jl")
+include("fit_gam.jl")
 include("plot_gam.jl")
-include("plot_smooths.jl")
-include("predict.jl")
+include("predict_gam.jl")
 include("summary.jl")
 
 export pen_log_lik
 export cv_log_lik
 export optimal_knots
 export GAM
-export fitGAM
+export fit_gam
 export plot_gam
-export plot_smooths
-export predict
+export predict_gam
 export summary
 
 end
