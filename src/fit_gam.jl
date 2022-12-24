@@ -25,7 +25,8 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, likelihood::Union{S
         knots = Vector{Vector{Float64}}(undef, n_features)
         n_knots = Vector{Int}(undef, n_features)
         for i in 1:n_features
-            knots[i], _ = optimal_knots(X[:, i], degree, min(n_samples, 50))
+            # Set default value for n_knots to ensure at least 2 knots are generated
+            knots[i], _ = optimal_knots(X[:, i+1], degree, max(2, get(n_knots, i, 50)))
             n_knots[i] = length(knots[i]) - degree - 1
         end
     end

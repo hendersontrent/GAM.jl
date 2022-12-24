@@ -1,5 +1,13 @@
 function optimal_knots(x::Array{Float64, 1}, degree::Int, n_knots::Int)
-    
+
+    if length(unique(x)) < 2
+        error("Input x must have at least two unique elements.")
+    end
+
+    if n_knots < 2
+        n_knots = 2
+    end
+
     knots = range(minimum(x), stop=maximum(x), length=n_knots)
     knots = knots[2:end-1]
     knots = sort(unique(knots))
