@@ -90,6 +90,8 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbo
         dist = Binomial()
     elseif family === :poisson
         dist = Poisson()
+    elseif family === :gamma
+        dist = Gamma()
     else
         error("Likelihood distribution family not recognised.")
     end

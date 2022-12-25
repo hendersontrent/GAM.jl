@@ -22,6 +22,7 @@ Currently, only a single non-formula based way of fitting GAMs is possible: `fit
 Currently, the following family types are supported:
 
 * `:gaussian` --- `Normal()` (continuous response variable).
+* `:gamma` --- `Gamma()` (continuous, positive response variable).
 * `:binomial` --- `Binomial()` (discrete, two-category response variable).
 * `:poisson` --- `Poisson()` (discrete, integer count response variable).
 
