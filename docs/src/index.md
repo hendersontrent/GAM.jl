@@ -27,8 +27,8 @@ Currently, the following family types are supported:
 
 As an exmaple, here is a simple GAM fit on the classic [`mtcars`](https://www.rdocumentation.org/packages/datasets/versions/3.6.2/topics/mtcars) dataset.
 
-```{julia}
-using Random, Distributions, RDatasets, GAM
+```jldoctest
+using Random, RDatasets, GAM
 
 mtcars = dataset("datasets", "mtcars")
 X = Matrix(mtcars[:, [:AM, :Cyl, :WT, :HP]])
