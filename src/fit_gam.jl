@@ -1,5 +1,5 @@
 """
-    GAMModel(β, knots, degree, n_knots, likelihood, λ, log_lik, aic, bic)
+    GAMModel(β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
 Holds information relevant to the GAM model including its components and fit statistics.
 
 Usage:
@@ -11,7 +11,7 @@ Arguments:
 - `knots` : Spline knot positions.
 - `degree` : Polynomial degree of the spline.
 - `n_knots` : Number of knots in the spline.
-- `likelihood` : Family of the likelihood function.
+- `family` : Family of the likelihood function.
 - `λ` : Regularization coefficient.
 - `log_lik` : The log-likelihood of the model.
 - `aic` : The Akaike information criterion.
@@ -22,7 +22,7 @@ struct GAMModel
     knots::Vector{Vector{Float64}}
     degree::Int
     n_knots::Vector{Int}
-    likelihood::Function
+    family::Function
     λ::Float64
     log_lik::Float64
     aic::Float64
@@ -30,7 +30,7 @@ struct GAMModel
 end
 
 """
-    fit_gam(X, y, likelihood, knots, degree, n_knots, λ, n_folds)
+    fit_gam(X, y, family, knots, degree, n_knots, λ, n_folds)
 Fits a generalised additive model (GAM) for a range of different likelihood distributions and computes model fit statistics.
 
 Usage:
@@ -40,14 +40,14 @@ fit_gam(X, y)
 Arguments:
 - `X` : Data matrix of predictor variables.
 - `y` : Response variable vector.
-- `likelihood` : Family of the likelihood function.
+- `family` : Family of the likelihood function.
 - `knots` : Spline knot positions.
 - `degree` : Polynomial degree of the spline.
 - `n_knots` : Number of knots in the spline.
 - `λ` : Coefficient of the penalty term.
 - `n_folds` : Number of folds to use in generalised cross-validation of parameters.
 """
-function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, likelihood::Union{Symbol, Function}, knots::Union{Nothing, Vector{Vector{Float64}}}=nothing, degree::Int=3, n_knots::Union{Nothing, Vector{Int}}=nothing, λ::Union{Nothing, Float64}=nothing, n_folds::Int=5)
+function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbol, Function}, knots::Union{Nothing, Vector{Vector{Float64}}}=nothing, degree::Int=3, n_knots::Union{Nothing, Vector{Int}}=nothing, λ::Union{Nothing, Float64}=nothing, n_folds::Int=5)
 
     # Add a column of ones to X for the intercept term
 
@@ -84,14 +84,14 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, likelihood::Union{S
 
     # Set the distribution based on the likelihood type
 
-    if likelihood === :gaussian
+    if family === :gaussian
         dist = Normal()
-    elseif likelihood === :binomial
+    elseif family === :binomial
         dist = Binomial()
-    elseif likelihood === :poisson
+    elseif family === :poisson
         dist = Poisson()
     else
-        error("Likelihood distribution not recognised.")
+        error("Likelihood distribution family not recognised.")
     end
 
 # If λ is not specified, optimize it using cross-validation
@@ -155,7 +155,7 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, likelihood::Union{S
 
     # Create the model object
 
-    model = GAMModel(β, knots, degree, n_knots, likelihood, λ, log_lik, aic, bic)
+    model = GAMModel(β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
 
     return model
 end

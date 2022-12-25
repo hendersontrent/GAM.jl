@@ -15,7 +15,7 @@ function predict_gam(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
 
     # Extract the model coefficients and knots
 
-    beta = model.beta
+    β = model.β
     knots = model.knots
     degree = model.degree
     n_knots = model.n_knots
@@ -34,7 +34,7 @@ function predict_gam(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
 
     # Compute the predicted values for the predictor variables
 
-    y_pred = spline_basis * beta[2:end] + beta[1]
+    y_pred = spline_basis * β[2:end] + β[1]
 
     # Compute the mean or probability predictions
 
