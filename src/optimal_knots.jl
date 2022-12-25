@@ -1,3 +1,16 @@
+"""
+    optimal_knots(x, degree, n_knots)
+Computes the optimal number of knots for a given spline.
+
+Usage:
+```julia-repl
+optimal_knots(x, degree, n_knots)
+```
+Arguments:
+- `x` : Vector of values for a predictor variable.
+- `degree` : Polynomial degree of the spline.
+- `n_knots` : Number of knots in the spline.
+"""
 function optimal_knots(x::Array{Float64, 1}, degree::Int, n_knots::Int)
 
     if length(unique(x)) < 2

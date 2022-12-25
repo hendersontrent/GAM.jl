@@ -1,8 +1,20 @@
-function summary(model::GAMModel)
+"""
+    summary(model, prob)
+Generate a summary table of model information, including coefficients, their standard errors, p-values, and confidence intervals.
+
+Usage:
+```julia-repl
+summary(model, prob)
+```
+Arguments:
+- `model` : The `GAMModel`.
+- `prob` : The probability to use for the confidence intervals.
+"""
+function summary(model::GAMModel, prob=0.95)
 
     # Extract the model coefficients and knots
 
-    beta = model.beta
+    β = model.β
     knots = model.knots
     degree = model.degree
     n_knots = model.n_knots
@@ -25,7 +37,7 @@ function summary(model::GAMModel)
 
         # Compute the predicted values for the predictor variable
 
-        y_pred = spline_basis * beta[2:(n_knots[i] + 1)] + beta[1]
+        y_pred = spline_basis * β[2:(n_knots[i] + 1)] + β[1]
 
         # Compute the variance of the predicted values
 
@@ -44,15 +56,15 @@ function summary(model::GAMModel)
 
         # Compute the test statistic, p-value, and confidence interval
 
-        test_stat = beta[1] / se_pred[1]
-        p_value = 2 * (1 - cdf(TDist(n_samples - length(beta)), abs(test_stat)))
-        ci_lower = beta[1] - 1.96 * se_pred[1]
-        ci_upper = beta[1] + 1.96 * se_pred[1]
+        test_stat = β[1] / se_pred[1]
+        p_value = 2 * (1 - cdf(TDist(n_samples - length(β)), abs(test_stat)))
+        lower = β[1] - quantile(TDist(n_samples - length(β)), 1 - ci_prob/2) * se_pred[1]
+        upper = β[1] + quantile(TDist(n_samples - length(β)), 1 - ci_prob/2) * se_pred[1]
 
         # Add the summary statistics to the data frame
         
         term_name = names(X)[i]
-        push!(df, (term_name, beta[1], test_stat, p_value, se_pred[1], (ci_lower, ci_upper)))
+        push!(df, (term_name, β[1], test_stat, p_value, se_pred[1], (lower, upper)))
     end
     return df
 end
