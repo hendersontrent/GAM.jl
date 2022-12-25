@@ -12,7 +12,7 @@ Arguments:
 - `degree` : Polynomial degree of the spline.
 - `n_knots` : Number of knots in the spline.
 - `family` : Family of the likelihood function.
-- `λ` : Regularization coefficient.
+- `λ` : Coefficient of the penalty term.
 - `log_lik` : The log-likelihood of the model.
 - `aic` : The Akaike information criterion.
 - `bic` : The Bayesian information criterion.
