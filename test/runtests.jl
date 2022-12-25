@@ -13,7 +13,7 @@ y = mtcars[:, :MPG]
     # Fit GAM
 
     model = fit_gam(X, y, :gaussian)
-    @test model isa GAM
+    @test model isa GAMModel
 
     # Return summary of GAM
 
@@ -28,5 +28,5 @@ y = mtcars[:, :MPG]
     # Predict with GAM
     
     preds = predict_gam(model, X, :mean)
-    @test p isa Array
+    @test preds isa Array
 end
