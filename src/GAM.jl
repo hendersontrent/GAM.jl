@@ -8,15 +8,16 @@ include("optimal_knots.jl")
 include("fit_gam.jl")
 include("plot_gam.jl")
 include("predict_gam.jl")
-include("summary.jl")
+include("summarise_gam.jl")
 
 export pen_log_lik
 export cv_log_lik
 export optimal_knots
-export GAM
+export GAMModel
 export fit_gam
 export plot_gam
 export predict_gam
-export summary
+export summarise_gam
+export summarize_gam
 
 end

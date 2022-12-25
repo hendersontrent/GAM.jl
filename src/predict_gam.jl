@@ -1,8 +1,21 @@
+"""
+    predict_gam(model, X, type)
+Generates a vector of predictions for new data using the fitted GAM.
+
+Usage:
+```julia-repl
+predict_gam(model, X, type)
+```
+Arguments:
+- `model` : The `GAMModel` object.
+- `X` : Matrix of new input data.
+- `type` : The type of prediction to make.
+"""
 function predict_gam(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
 
     # Extract the model coefficients and knots
 
-    beta = model.beta
+    β = model.β
     knots = model.knots
     degree = model.degree
     n_knots = model.n_knots
@@ -21,7 +34,7 @@ function predict_gam(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
 
     # Compute the predicted values for the predictor variables
 
-    y_pred = spline_basis * beta[2:end] + beta[1]
+    y_pred = spline_basis * β[2:end] + β[1]
 
     # Compute the mean or probability predictions
 

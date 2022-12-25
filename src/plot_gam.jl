@@ -1,8 +1,23 @@
-function plot_gam(model::GAMModel, X::Array{Float64, 2}, y::Array{Float64, 1}, x_var::Union{Int, String})
+"""
+    plot_gam(model, X, y, x_var, prob)
+Generate a plot of the smooth for one of the predictor variables in the GAM with a confidence interval.
+
+Usage:
+```julia-repl
+plot_gam(model, X, y, x_var, prob)
+```
+Arguments:
+- `model` : The `GAMModel`.
+- `X` : Data matrix of predictor variables.
+- `y` : Response variable vector.
+- `x_var` : Index of the variable of interest in the data matrix `X`.
+- `prob` : The probability for the confidence intervals.
+"""
+function plot_gam(model::GAMModel, X::Array{Float64, 2}, y::Array{Float64, 1}, x_var::Union{Int, String}, prob::Float64=0.95)
 
     # Extract the model coefficients and knots
 
-    beta = model.beta
+    β = model.β
     knots = model.knots
     degree = model.degree
     n_knots = model.n_knots
@@ -23,7 +38,7 @@ function plot_gam(model::GAMModel, X::Array{Float64, 2}, y::Array{Float64, 1}, x
     spline_basis = spline_basis[:, 2:end]
     # Compute the predicted values for the predictor variable
 
-    y_pred = spline_basis * beta[2:(n_knots[x_idx] + 1)] + beta[1]
+    y_pred = spline_basis * β[2:(n_knots[x_idx] + 1)] + β[1]
 
     # Compute confidence intervals
 
@@ -32,23 +47,26 @@ function plot_gam(model::GAMModel, X::Array{Float64, 2}, y::Array{Float64, 1}, x
 
     if model.likelihood === :gaussian
         for i in 1:n_samples
-            var_pred[i] = 1 / model.alpha * sum(spline_basis[i, :] .^ 2)
+            var_pred[i] = 1 / model.λ * sum(spline_basis[i, :] .^ 2)
         end
         se_pred = sqrt.(var_pred)
-        ci_lower = y_pred .- 1.96 * se_pred
-        ci_upper = y_pred .+ 1.96 * se_pred
+        ci = inv(Normal(), prob)
+        lower = y_pred .- ci * se_pred
+        upper = y_pred .+ ci * se_pred
     else
         for i in 1:n_samples
-            var_pred[i] = y_pred[i] * (1 - y_pred[i]) / model.alpha
+            var_pred[i] = y_pred[i] * (1 - y_pred[i]) / model.λ
         end
         se_pred = sqrt.(var_pred)
-        ci_lower = y_pred .- 1.96 * se_pred
-        ci_upper = y_pred .+ 1.96 * se_pred
+        ci = inv(Normal(), prob)
+        lower = y_pred .- ci * se_pred
+        upper = y_pred .+ ci * se_pred
     end
 
     # Draw plot
 
-    p = scatter(x_pred, y, yerror=[ci_lower, ci_upper], alpha=0.5)
+    p = scatter(x_pred, y, alpha=0.5)
+    ribbon(x_pred, lower, upper, alpha=0.2)
     plot!(x_pred, y_pred, linewidth=2)
     return p
 end

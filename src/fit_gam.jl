@@ -1,16 +1,53 @@
-struct GAM
-    beta::Vector{Float64}
+"""
+    GAMModel(β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
+Holds information relevant to the GAM model including its components and fit statistics.
+
+Usage:
+```julia-repl
+fit_gam(X, y)
+```
+Arguments:
+- `β` : Model coefficients.
+- `knots` : Spline knot positions.
+- `degree` : Polynomial degree of the spline.
+- `n_knots` : Number of knots in the spline.
+- `family` : Family of the likelihood function.
+- `λ` : Coefficient of the penalty term.
+- `log_lik` : The log-likelihood of the model.
+- `aic` : The Akaike information criterion.
+- `bic` : The Bayesian information criterion.
+"""
+struct GAMModel
+    β::Vector{Float64}
     knots::Vector{Vector{Float64}}
     degree::Int
     n_knots::Vector{Int}
-    likelihood::Function
-    alpha::Float64
+    family::Function
+    λ::Float64
     log_lik::Float64
     aic::Float64
     bic::Float64
 end
 
-function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothing, Vector{Vector{Float64}}}, degree::Int = 3, n_knots::Union{Nothing, Vector{Int}}, likelihood::Union{Symbol, Function}, alpha::Union{Nothing, Float64}, n_folds::Int = 5)
+"""
+    fit_gam(X, y, family, knots, degree, n_knots, λ, n_folds)
+Fits a generalised additive model (GAM) for a range of different likelihood distributions and computes model fit statistics.
+
+Usage:
+```julia-repl
+fit_gam(X, y)
+```
+Arguments:
+- `X` : Data matrix of predictor variables.
+- `y` : Response variable vector.
+- `family` : Family of the likelihood function.
+- `knots` : Spline knot positions.
+- `degree` : Polynomial degree of the spline.
+- `n_knots` : Number of knots in the spline.
+- `λ` : Coefficient of the penalty term.
+- `n_folds` : Number of folds to use in generalised cross-validation of parameters.
+"""
+function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbol, Function}, knots::Union{Nothing, Vector{Vector{Float64}}}=nothing, degree::Int=3, n_knots::Union{Nothing, Vector{Int}}=nothing, λ::Union{Nothing, Float64}=nothing, n_folds::Int=5)
 
     # Add a column of ones to X for the intercept term
 
@@ -25,7 +62,8 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
         knots = Vector{Vector{Float64}}(undef, n_features)
         n_knots = Vector{Int}(undef, n_features)
         for i in 1:n_features
-            knots[i], _ = optimal_knots(X[:, i], degree, min(n_samples, 50))
+            # Set default value for n_knots to ensure at least 2 knots are generated
+            knots[i], _ = optimal_knots(X[:, i+1], degree, max(2, get(n_knots, i, 50)))
             n_knots[i] = length(knots[i]) - degree - 1
         end
     end
@@ -42,28 +80,30 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
     # Initialize the model coefficients to zeros
 
     n_features = size(X, 2)
-    beta = zeros(n_features)
+    β = zeros(n_features)
 
     # Set the distribution based on the likelihood type
 
-    if likelihood === :gaussian
+    if family === :gaussian
         dist = Normal()
-    elseif likelihood === :binomial
+    elseif family === :binomial
         dist = Binomial()
-    elseif likelihood === :poisson
+    elseif family === :poisson
         dist = Poisson()
+    elseif family === :gamma
+        dist = Gamma()
     else
-        error("Likelihood distribution not recognised.")
+        error("Likelihood distribution family not recognised.")
     end
 
-# If alpha is not specified, optimize it using cross-validation
+# If λ is not specified, optimize it using cross-validation
 
-    if alpha === nothing
-        alpha_vals = logspace(-3, 3, 7)
-        cv_scores = Vector{Float64}(undef, length(alpha_vals))
+    if λ === nothing
+        lambda_vals = logspace(-3, 3, 7)
+        cv_scores = Vector{Float64}(undef, length(lambda_vals))
 
-        for (i, alpha_val) in enumerate(alpha_vals)
-            # Compute the cross-validated log likelihood for the alpha
+        for (i, lambda_val) in enumerate(lambda_vals)
+            # Compute the cross-validated log likelihood for λ
             fold_log_lik = Vector{Float64}(undef, n_folds)
 
             for j in 1:n_folds
@@ -78,23 +118,23 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
 
                 # Compute the penalized log likelihood for the training data
 
-                res = optimize(beta -> penalized_log_lik(X_train, y_train, beta, dist, alpha_val, penalty_matrix), beta, BFGS(), Optim.Options(show_trace=false))
-                beta = res.minimizer
-                fold_log_lik[j] = log_lik(X_test, y_test, beta, dist)
+                res = optimize(β -> penalized_log_lik(X_train, y_train, β, dist, lambda_val, penalty_matrix), β, BFGS(), Optim.Options(show_trace=false))
+                β = res.minimizer
+                fold_log_lik[j] = log_lik(X_test, y_test, β, dist)
             end
 
             # Compute the average cross-validated log likelihood
             cv_scores[i] = mean(fold_log_lik)
         end
 
-        # Select the alpha value with the lowest cross-validation score
+        # Select the λ value with the lowest cross-validation score
 
-        alpha_idx = argmin(cv_scores)
-        alpha = alpha_vals[alpha_idx]
+        lambda_idx = argmin(cv_scores)
+        λ = lambda_vals[lambda_idx]
 
         # Re-initialize the model coefficients to zeros
 
-        beta = zeros(n_features)
+        β = zeros(n_features)
     end
 
     # Compute the penalty matrix for the spline basis functions
@@ -105,8 +145,8 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
 
     # Optimize the model coefficients using the penalized likelihood approach
 
-    res = optimize(beta -> penalized_log_lik(X, y, beta, dist, alpha, penalty_matrix), beta, BFGS(), Optim.Options(show_trace=false))
-    beta = res.minimizer
+    res = optimize(β -> penalized_log_lik(X, y, β, dist, λ, penalty_matrix), β, BFGS(), Optim.Options(show_trace=false))
+    β = res.minimizer
     log_lik = -res.minimum
 
     # Compute the AIC and BIC
@@ -117,7 +157,7 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, knots::Union{Nothin
 
     # Create the model object
 
-    model = GAM(beta, knots, degree, n_knots, likelihood, alpha, log_lik, aic, bic)
+    model = GAMModel(β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
 
     return model
 end

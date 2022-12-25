@@ -1,19 +1,19 @@
 using GAM
 using Test
-using Random, Distributions, RDatasets, Plots
+using Random, RDatasets, Plots
 
 # Get mtcars data
 
 mtcars = dataset("datasets", "mtcars")
-X = mtcars[:, [:am, :cyl, :wt, :hp]]
-y = mtcars[:, :mpg]
+X = Matrix(mtcars[:, [:AM, :Cyl, :WT, :HP]])
+y = mtcars[:, :MPG]
 
 @testset "GAM.jl" begin
 
     # Fit GAM
 
-    model = fit_gam(X, y, likelihood = :gaussian)
-    @test model isa GAM
+    model = fit_gam(X, y, :gaussian)
+    @test model isa GAMModel
 
     # Return summary of GAM
 
@@ -28,5 +28,5 @@ y = mtcars[:, :mpg]
     # Predict with GAM
     
     preds = predict_gam(model, X, :mean)
-    @test p isa Array
+    @test preds isa Array
 end
