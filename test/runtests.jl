@@ -1,6 +1,6 @@
 using GAM
 using Test
-using Random, RDatasets, Plots
+using RDatasets, DataFrames, Plots
 
 # Get mtcars data
 
