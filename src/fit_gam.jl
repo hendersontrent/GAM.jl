@@ -1,12 +1,10 @@
 """
-    GAMModel(β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
+    GAMModel(formula, data, β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
 Holds information relevant to the GAM model including its components and fit statistics.
 
-Usage:
-```julia-repl
-fit_gam(X, y)
-```
 Arguments:
+- `formula` : The model formula.
+- `data` : DataFrame of input data.
 - `β` : Model coefficients.
 - `knots` : Spline knot positions.
 - `degree` : Polynomial degree of the spline.
@@ -18,6 +16,8 @@ Arguments:
 - `bic` : The Bayesian information criterion.
 """
 struct GAMModel
+    formula::Expr
+    df::DataFrame
     β::Vector{Float64}
     knots::Vector{Vector{Float64}}
     degree::Int
@@ -30,55 +30,64 @@ struct GAMModel
 end
 
 """
-    fit_gam(X, y, family, knots, degree, n_knots, λ, n_folds)
+    fit_gam(formula, data, family, knots, degree, n_knots, λ, n_folds)
 Fits a generalised additive model (GAM) for a range of different likelihood distributions and computes model fit statistics.
 
 Usage:
 ```julia-repl
-fit_gam(X, y)
+fit_gam(formula, data, family)
 ```
 Arguments:
-- `X` : Data matrix of predictor variables.
-- `y` : Response variable vector.
+- `formula` : The model formula.
+- `data` : DataFrame of input data.
 - `family` : Family of the likelihood function.
-- `knots` : Spline knot positions.
-- `degree` : Polynomial degree of the spline.
-- `n_knots` : Number of knots in the spline.
 - `λ` : Coefficient of the penalty term.
 - `n_folds` : Number of folds to use in generalised cross-validation of parameters.
 """
-function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbol, Function}, knots::Union{Nothing, Vector{Vector{Float64}}}=nothing, degree::Int=3, n_knots::Union{Nothing, Vector{Int}}=nothing, λ::Union{Nothing, Float64}=nothing, n_folds::Int=5)
+function fit_gam(formula::Union{Symbol, Expr}, data::DataFrame, family::Union{Symbol, Function}, λ::Union{Nothing, Float64}=nothing, n_folds::Int=5)
+    # Check if the formula includes an intercept term
+    if typeof(formula) == Expr
+        # Check if the formula includes the intercept term
+        if !(:Intercept in formula.rhs)
+            # Add the intercept term to the formula
+            formula = :(:($(formula.lhs)) ~ 1 + $(formula.rhs))
+        end
+    else
+        # Add the intercept term to the formula
+        formula = :(:($formula) ~ 1)
+    end
 
-    # Add a column of ones to X for the intercept term
+    # Parse the formula and data
+    y, smooth_terms, cat_vars, knots, degree, polynomial_degree = parse_formula(data, formula)
 
-    X = hcat(ones(size(X, 1)), X)
+    # Extract the predictor variables and their spline basis functions
+    X = Array{Float64}(undef, size(data, 1), 0)
+    spline_basis = Vector{Matrix{Float64}}(undef, length(smooth_terms))
 
-    # Create spline basis functions for each predictor
-
-    n_samples, n_features = size(X)
-    spline_basis = [zeros(size(X, 1), 1) for i in 1:n_features]
-
-    if knots === nothing
-        knots = Vector{Vector{Float64}}(undef, n_features)
-        n_knots = Vector{Int}(undef, n_features)
-        for i in 1:n_features
-            # Set default value for n_knots to ensure at least 2 knots are generated
-            knots[i], _ = optimal_knots(X[:, i+1], degree, max(2, get(n_knots, i, 50)))
-            n_knots[i] = length(knots[i]) - degree - 1
+    # Iterate over the smooth terms
+    for (i, term) in enumerate(smooth_terms)
+        # Check if the term is the intercept
+        if term == :Intercept
+            X = hcat(X, ones(size(data, 1)))
+        else
+            # Extract the predictor and its spline basis functions
+            predictor = data[term]
+            knots_i = knots[i]
+            degree_i = degree[i]
+            polynomial_degree_i = polynomial_degree[i]
+            spline_basis[i] = hcat(BSplineBasis(knots_i, degree_i, predictor, polynomial_degree_i))
+            spline_basis[i] = spline_basis[i][:, 2:end]
+            X = hcat(X, spline_basis[i])
         end
     end
 
-    for i in 1:n_features
-        spline_basis[i] = hcat(spline_basis[i], BSplineBasis(knots[i], degree, X[:, i]))
-        spline_basis[i] = spline_basis[i][:, 2:end]
+    # Add the categorical variables to the predictor matrix
+    for term in cat_vars
+        # Convert the categorical variable to dummy variables
+        X = hcat(X, dummy_encoder(data[term]))
     end
 
-    # Concatenate the spline basis functions with the intercept term
-
-    X = hcat(spline_basis..., X)
-
     # Initialize the model coefficients to zeros
-
     n_features = size(X, 2)
     β = zeros(n_features)
 
@@ -96,7 +105,7 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbo
         error("Likelihood distribution family not recognised.")
     end
 
-# If λ is not specified, optimize it using cross-validation
+    # If λ is not specified, optimize it using cross-validation
 
     if λ === nothing
         lambda_vals = logspace(-3, 3, 7)
@@ -107,14 +116,13 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbo
             fold_log_lik = Vector{Float64}(undef, n_folds)
 
             for j in 1:n_folds
-
                 # Split the data into training and test sets
 
-                idx = foldind(y, n_folds, j)
+                idx = foldind(data[y], n_folds, j)
                 X_train = X[.!idx, :]
-                y_train = y[.!idx]
+                y_train = data[y][.!idx]
                 X_test = X[idx, :]
-                y_test = y[idx]
+                y_test = data[y][idx]
 
                 # Compute the penalized log likelihood for the training data
 
@@ -127,37 +135,21 @@ function fit_gam(X::Array{Float64, 2}, y::Array{Float64, 1}, family::Union{Symbo
             cv_scores[i] = mean(fold_log_lik)
         end
 
-        # Select the λ value with the lowest cross-validation score
-
-        lambda_idx = argmin(cv_scores)
-        λ = lambda_vals[lambda_idx]
-
-        # Re-initialize the model coefficients to zeros
-
-        β = zeros(n_features)
+            # Select the λ value with the highest cross-validated log likelihood
+            λ = lambda_vals[argmax(cv_scores)]
     end
 
-    # Compute the penalty matrix for the spline basis functions
-
-    penalty = zeros(size(X, 2))
-    penalty[2:end] = 1
-    penalty_matrix = BSplinePenalty(penalty, knots, degree)
-
-    # Optimize the model coefficients using the penalized likelihood approach
-
-    res = optimize(β -> penalized_log_lik(X, y, β, dist, λ, penalty_matrix), β, BFGS(), Optim.Options(show_trace=false))
+    # Compute the penalized log likelihood for the full dataset
+    res = optimize(β -> penalized_log_lik(X, data[y], β, dist, λ, penalty_matrix), β, BFGS(), Optim.Options(show_trace=false))
     β = res.minimizer
-    log_lik = -res.minimum
 
-    # Compute the AIC and BIC
+    # Compute the log likelihood and information criteria for the model
+    log_lik_val = log_lik(X, data[y], β, dist)
+    n_obs = size(X, 1)
+    n_params = size(X, 2)
+    aic_val = -2 * log_lik_val + 2 * n_params
+    bic_val = -2 * log_lik_val + n_params * log(n_obs)
 
-    n_params = n_features
-    aic = -2 * log_lik + 2 * n_params
-    bic = -2 * log_lik + n_params * log(length(y))
-
-    # Create the model object
-
-    model = GAMModel(β, knots, degree, n_knots, family, λ, log_lik, aic, bic)
-
-    return model
+    # Return the fitted model
+    return GAMModel(formula, data, β, knots, degree, n_knots, family, λ, log_lik_val, aic_val, bic_val)
 end

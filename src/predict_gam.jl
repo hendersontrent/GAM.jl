@@ -11,38 +11,44 @@ Arguments:
 - `X` : Matrix of new input data.
 - `type` : The type of prediction to make.
 """
-function predict_gam(model::GAMModel, X::Array{Float64, 2}, type::Symbol)
-
+function predict_gam(model::GAMModel, newdata::DataFrame)
     # Extract the model coefficients and knots
-
     β = model.β
     knots = model.knots
     degree = model.degree
     n_knots = model.n_knots
-    dist = model.likelihood
 
-    # Create the spline basis functions for each predictor variable
+    # Parse the formula and data
+    y, smooth_terms, cat_vars, knots, degree, polynomial_degree = parse_formula(newdata, model.formula)
 
-    spline_basis = zeros(size(X, 1), 1)
-    n_features = size(X, 2)
-    for i in 1:n_features
-        x_pred = X[:, i]
-        spline_basis = hcat(spline_basis, BSplineBasis(knots[i], degree, x_pred))
+    # Extract the predictor variables and their spline basis functions
+    X = Array{Float64}(undef, size(newdata, 1), 0)
+    spline_basis = Vector{Matrix{Float64}}(undef, length(smooth_terms))
+
+    # Iterate over the smooth terms
+    for (i, term) in enumerate(smooth_terms)
+        # Check if the term is the intercept
+        if term == :Intercept
+            X = hcat(X, ones(size(newdata, 1)))
+        else
+            # Extract the predictor and its spline basis functions
+            predictor = newdata[term]
+            knots_i = knots[i]
+            degree_i = degree[i]
+            polynomial_degree_i = polynomial_degree[i]
+            spline_basis[i] = hcat(BSplineBasis(knots_i, degree_i, predictor, polynomial_degree_i))
+            spline_basis[i] = spline_basis[i][:, 2:end]
+            X = hcat(X, spline_basis[i])
+        end
     end
 
-    spline_basis = spline_basis[:, 2:end]
-
-    # Compute the predicted values for the predictor variables
-
-    y_pred = spline_basis * β[2:end] + β[1]
-
-    # Compute the mean or probability predictions
-
-    if type === :mean
-        return dist.linkinv.(y_pred)
-    elseif type === :prob
-        return dist.link.(y_pred)
-    else
-        error("Invalid prediction type.")
+    # Add the categorical variables to the predictor matrix
+    for term in cat_vars
+        # Convert the categorical variable to dummy variables
+        X_new = hcat(X_new, dummy_encoder(data[term]))
     end
+
+    # Compute the predictions
+    predictions = X_new * β
+    return predictions
 end
