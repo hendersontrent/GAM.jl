@@ -1,6 +1,6 @@
 # GAM.jl manual
 
-Fit and evaluate generalised additive models (GAMs) in Julia
+Fit, evaluate, and visualise generalised additive models (GAMs) in native Julia.
 
 ## Installation
 
