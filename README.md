@@ -33,7 +33,7 @@ $$
 B_{k,j}(x_j) = \prod_{m=1}^{d} (x_j - \text{knots}_{k,m})^{[x_j \geq \text{knots}_{k,m}]} \,
 $$
 
-where $d$ is the degree of the spline, $\text{knots}_{k,m}$ is the $m$th knot for the $k$th spline basis function, and $[\cdot]$ is the Iverson bracket.
+where $d$ is the degree of the spline, $\text{knots}_{k,m}$ is the *m*th knot for the *k*th spline basis function, and $[\cdot]$ is the Iverson bracket.
 
 The spline basis functions are defined such that they are zero outside of the range of the knots. The coefficients $\beta$ are estimated by minimizing the negative log-likelihood:
 
