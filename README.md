@@ -1,6 +1,10 @@
 # GAM.jl
 Fit, evaluate, and visualise generalised additive models (GAMs) in native Julia
 
+## Installation
+
+*Coming soon!*
+
 ## Motivation
 
 [Generalised additive models](https://en.wikipedia.org/wiki/Generalized_additive_model) (GAMs) are an incredibly powerful modelling tool for regression practitioners. However, the functionality of the excellent R package [`mgcv`](https://cran.r-project.org/web/packages/mgcv/mgcv.pdf) is yet to be built in native Julia. This package aims to do just that, albeit at much less complexity given how sophisticated `mgcv` is.
