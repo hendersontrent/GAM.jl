@@ -1,15 +1,14 @@
 """
-    predict_gam(model, X, type)
+    predict_gam(model, newdata)
 Generates a vector of predictions for new data using the fitted GAM.
 
 Usage:
 ```julia-repl
-predict_gam(model, X, type)
+predict_gam(model, newdata)
 ```
 Arguments:
 - `model` : The `GAMModel` object.
-- `X` : Matrix of new input data.
-- `type` : The type of prediction to make.
+- `newdata` : DataFrame of new input data.
 """
 function predict_gam(model::GAMModel, newdata::DataFrame)
     # Extract the model coefficients and knots
@@ -21,11 +20,10 @@ function predict_gam(model::GAMModel, newdata::DataFrame)
     # Parse the formula and data
     y, smooth_terms, cat_vars, knots, degree, polynomial_degree = parse_formula(newdata, model.formula)
 
-    # Extract the predictor variables and their spline basis functions
-    X = Array{Float64}(undef, size(newdata, 1), 0)
-    spline_basis = Vector{Matrix{Float64}}(undef, length(smooth_terms))
+    # Initialize the predictor matrix
+    X = []
 
-    # Iterate over the smooth terms
+    # Extract the predictor variables and their spline basis functions
     for (i, term) in enumerate(smooth_terms)
         # Check if the term is the intercept
         if term == :Intercept
@@ -36,19 +34,19 @@ function predict_gam(model::GAMModel, newdata::DataFrame)
             knots_i = knots[i]
             degree_i = degree[i]
             polynomial_degree_i = polynomial_degree[i]
-            spline_basis[i] = hcat(BSplineBasis(knots_i, degree_i, predictor, polynomial_degree_i))
-            spline_basis[i] = spline_basis[i][:, 2:end]
-            X = hcat(X, spline_basis[i])
+            spline_basis = hcat(BSplineBasis(knots_i, degree_i, predictor, polynomial_degree_i))
+            spline_basis = spline_basis[:, 2:end]
+            X = hcat(X, spline_basis)
         end
     end
 
     # Add the categorical variables to the predictor matrix
     for term in cat_vars
         # Convert the categorical variable to dummy variables
-        X_new = hcat(X_new, dummy_encoder(data[term]))
+        X = hcat(X, dummy_encoder(data[term]))
     end
 
     # Compute the predictions
-    predictions = X_new * β
+    predictions = X * β
     return predictions
 end
