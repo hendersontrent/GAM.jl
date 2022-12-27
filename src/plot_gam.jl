@@ -1,19 +1,17 @@
 """
-    plot_gam(model, X, y, x_var, prob)
+    plot_gam(model, x_var, prob)
 Generate a plot of the smooth for one of the predictor variables in the GAM with a confidence interval.
 
 Usage:
 ```julia-repl
-plot_gam(model, X, y, x_var, prob)
+plot_gam(model, x_var, prob)
 ```
 Arguments:
 - `model` : The `GAMModel`.
-- `X` : Data matrix of predictor variables.
-- `y` : Response variable vector.
 - `x_var` : Index of the variable of interest in the data matrix `X`.
 - `prob` : The probability for the confidence intervals.
 """
-function plot_gam(model::GAMModel, X::Array{Float64, 2}, y::Array{Float64, 1}, x_var::Union{Int, String}, prob::Float64=0.95)
+function plot_gam(model::GAMModel, x_var::String, prob::Float64=0.95)
 
     # Extract the model coefficients, knots, degrees, and polynomial degrees
 
@@ -25,12 +23,8 @@ function plot_gam(model::GAMModel, X::Array{Float64, 2}, y::Array{Float64, 1}, x
 
     # Get the indices of the predictor variables
 
-    if x_var isa Int
-        x_idx = x_var
-    else
-        x_idx = findfirst(names(model.df), x_var)
-    end
-    
+    x_idx = findfirst(names(model.df), x_var)
+
     # Create the spline basis functions for the predictor variable
 
     x_pred = model.df[:, x_idx]

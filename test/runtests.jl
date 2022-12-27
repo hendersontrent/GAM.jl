@@ -5,28 +5,26 @@ using RDatasets, DataFrames, Plots
 # Get mtcars data
 
 mtcars = dataset("datasets", "mtcars")
-X = Matrix(mtcars[:, [:AM, :Cyl, :WT, :HP]])
-y = mtcars[:, :MPG]
 
 @testset "GAM.jl" begin
 
     # Fit GAM
 
-    model = fit_gam(X, y, :gaussian)
-    @test model isa GAMModel
+    mod = fit_gam(@formula(MPG ~ s(WT, 3) + s(HP, 3) + AM + Cyl), mtcars, :gaussian)
+    @test mod isa GAMModel
 
     # Return summary of GAM
 
-    summary = summary(model)
+    summary = summarise_gam(mod)
     @test summary isa DataFrames.DataFrame
 
-    # Plot GAM for first predictor
+    # Plot GAM for a continuous predictor
     
-    p = plot_gam(model, X, y, 1)
+    p = plot_gam(mod, "WT", 0.95)
     @test p isa Plots.Plot
 
     # Predict with GAM
     
-    preds = predict_gam(model, X, :mean)
+    preds = predict_gam(mod, mtcars)
     @test preds isa Array
 end

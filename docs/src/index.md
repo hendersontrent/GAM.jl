@@ -8,14 +8,11 @@ Fit, evaluate, and visualise generalised additive models (GAMs) in native Julia.
 
 ## Fitting GAMs
 
-Currently, only a single non-formula based way of fitting GAMs is possible: `fit_gam(X, y, family, knots, degree, n_knots, λ, n_folds)`, however, only three arguments are essential, and a GAM can be fit as simply as with `fit_gam(X, y, family)`. The arguments include:
+Currently, only a formula-based way of fitting GAMs is possible: `fit_gam(formula, data, family, knots, degree, n_knots, λ, n_folds)`. This design decision was made to ensure consistency with the popular R package for fitting GAMs [`mgcv`](https://cran.r-project.org/web/packages/mgcv/mgcv.pdf). However, only three arguments are essential, and a GAM can be fit as simply as with `fit_gam(formula, data, family)`. The arguments include:
 
-* `X` --- Data matrix of predictor variables.
-* `y` --- Response variable vector.
+* `formula` --- The model formula.
+* `data` --- DataFrame of input data.
 * `family` --- Family of the likelihood function.
-* `knots` --- Spline knot positions.
-* `degree` --- Polynomial degree of the spline.
-* `n_knots` --- Number of knots in the spline.
 * `λ` --- Coefficient of the penalty term.
 * `n_folds` --- Number of folds to use in generalised cross-validation of parameters.
 
@@ -26,16 +23,18 @@ Currently, the following family types are supported:
 * `:binomial` --- `Binomial()` (discrete, two-category response variable).
 * `:poisson` --- `Poisson()` (discrete, integer count response variable).
 
-As an exmaple, here is a simple GAM fit on the classic [`mtcars`](https://www.rdocumentation.org/packages/datasets/versions/3.6.2/topics/mtcars) dataset.
+As an example, here is a simple GAM fit on the classic [`mtcars`](https://www.rdocumentation.org/packages/datasets/versions/3.6.2/topics/mtcars) dataset.
 
 ```jldoctest
-using Random, RDatasets, GAM
+using RDatasets, GAM
 
 mtcars = dataset("datasets", "mtcars")
-X = Matrix(mtcars[:, [:AM, :Cyl, :WT, :HP]])
-y = mtcars[:, :MPG]
-model = fit_gam(X, y, :gaussian)
+mod = fit_gam(@formula(MPG ~ s(WT, 3) + s(HP, 3) + AM + Cyl), mtcars, :gaussian)
 ```
+
+Note the same syntactical structure as `mgcv` where `s()` in `GAM.jl` denotes a smooth term to be constructed over a continuous predictor. Categorical predictors are left as-is---such as `AM` in the above example. For smooth terms, only one argument is required, which is the variable (column) name in the DataFrame. For more nuanced modelling, users can ignore the defaults to the second two arguments (degree---`degree` and knots---`k`). `degree` takes an integer value between 1 and 4. A value of 1 corresponds to a linear spline, a value of 2 corresponds to a quadratic spline, and so on. The default value for degree is 3, which corresponds to a cubic spline. `k` takes an integer value between 1 and 3. A value of 1 corresponds to a linear polynomial, a value of 2 corresponds to a quadratic polynomial, and a value of 3 corresponds to a cubic polynomial. The default value for k is 1, which corresponds to a linear polynomial.
+
+Note that if a prepended `1` is omitted from the formula, `GAM.jl` will automatically include a column of ones into the data matrix for the intercept. Alternatively, if a prepended `1` is detected (e.g., `@formula(MPG ~ 1 + s(WT, 3) + s(HP, 3) + AM + Cyl)`), `GAM.jl` will also take that to include an intercept term. Either way, one is included.
 
 ## Evaluating GAMs
 
@@ -52,24 +51,33 @@ A useful tool in regression modelling is the coefficients table. `GAM.jl` produc
 * `model` --- The `GAMModel` object created by `fit_gam`.
 * `prob` --- The probability for the confidence intervals. Defaults to `0.95` for 95% confidence intervals.
 
-This function produces a familiar-looking table to those who use tools such as [`GLM.jl`](https://github.com/JuliaStats/GLM.jl) or any regression function in R such as `lm`, `glm`, or `gam` from [`mgcv`](https://cran.r-project.org/web/packages/mgcv/mgcv.pdf):
+This function produces a familiar-looking table to those who use tools such as [`GLM.jl`](https://github.com/JuliaStats/GLM.jl) or any regression function in R such as `lm`, `glm`, or `gam` from `mgcv`:
 
-
+```jldoctest
+println(summarise_gam(mod, 0.95))
+```
 
 ### Plotting
 
-Currently, `GAM.jl` only supports one type of plot which is a ribbon plot of the smooth of one of the predictor variables, complete with confidence intervals. `plot_gam` only takes five arguments:
+Currently, `GAM.jl` only supports one type of plot which is a ribbon plot of the smooth of one of the predictor variables, complete with confidence intervals. `plot_gam` only takes three arguments:
 
-* `model` --- The `GAMModel` object created by `fit_gam`.
-* `X` --- Data matrix of predictor variables.
-* `y` --- Response variable vector.
-* `x_var` --- The column index of the variable in `X` to plot the smooth for.
-* `prob` --- The probability for the confidence intervals. Defaults to `0.95` for 95% confidence intervals.
+* `model` --- The `GAMModel`.
+* `x_var` --- String name of the variable of interest in the DataFrame.
+* `prob` --- The probability for the confidence intervals.
+
+This function produces similar graphics to `mgcv::plot.gam` in R:
+
+```jldoctest
+plot_gam(mod, 0.95)
+```
 
 ### Predicting
 
-Generating predictions for a GAM is very simple in `GAM.jl`. The function `predict_gam` only takes three arguments:
+Generating predictions for new data using a fitted GAM is very simple in `GAM.jl`. The function `predict_gam` only takes two arguments:
 
-* `model` --- The `GAMModel` object created by `fit_gam`.
-* `X` --- Matrix of new input data.
-* `type` --- Whether to generate mean or probability predictions.
+- `model` --- The `GAMModel` object.
+- `newdata` --- DataFrame of new input data.
+
+```jldoctest
+predict_gam(mod, 0.95)
+```

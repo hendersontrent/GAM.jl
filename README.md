@@ -31,4 +31,4 @@ $$
 \mathcal{L}(\beta) = -\sum_{i=1}^n \log p(y_i \mid \beta) + \lambda \sum_{j=1}^p \sum_{k=1}^{K_j} \beta_{jk}^2 \,
 $$
 
-where $n$ is the number of observations, $p$ is the number of predictors, $\lambda$ is the regularization parameter, and $p(y_i \mid \beta)$ is the probability density function (PDF) or probability mass function (PMF) of the response variable given the model parameters.
+where $\mathcal{L}(\beta)$ is the negative log likelihood, $n$ is the number of samples, $p$ is the number of smooth terms, $K_j$ is the number of knots for the $j$-th smooth term, $\beta_{jk}$ is the coefficient for the $k$-th knot in the $j$-th smooth term, $y_i$ is the $i$-th response variable, $\lambda$ is the penalty term, and $p(y_i \mid \beta)$ is the probability density function (PDF) or probability mass function (PMF) of the response variable given the model parameters.. The first term in the sum is the negative log likelihood of the response variable given the model coefficients, and the second term is the penalty term that is added to the negative log likelihood to enforce smoothness in the model.
