@@ -8,7 +8,7 @@ plot_gam(model, x_var, prob)
 ```
 Arguments:
 - `model` : The `GAMModel`.
-- `x_var` : Index of the variable of interest in the data matrix `X`.
+- `x_var` : String name of the variable of interest in the DataFrame.
 - `prob` : The probability for the confidence intervals.
 """
 function plot_gam(model::GAMModel, x_var::String, prob::Float64=0.95)
