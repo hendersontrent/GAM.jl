@@ -60,9 +60,9 @@ function fit_gam(formula::Union{Symbol, Expr}, data::DataFrame, family::Union{Sy
     # Parse the formula and data
     y, smooth_terms, cat_vars, knots, degree, polynomial_degree = parse_formula(data, formula)
 
-    # Extract the predictor variables and their spline basis functions
+    # Extract the predictor variables and their thin plate regression spline basis functions
     X = Array{Float64}(undef, size(data, 1), 0)
-    spline_basis = Vector{Matrix{Float64}}(undef, length(smooth_terms))
+    tprs_basis = Vector{Matrix{Float64}}(undef, length(smooth_terms))
 
     # Iterate over the smooth terms
     for (i, term) in enumerate(smooth_terms)
@@ -70,14 +70,13 @@ function fit_gam(formula::Union{Symbol, Expr}, data::DataFrame, family::Union{Sy
         if term == :Intercept
             X = hcat(X, ones(size(data, 1)))
         else
-            # Extract the predictor and its spline basis functions
+            # Extract the predictor and its thin plate regression spline basis functions
             predictor = data[term]
             knots_i = knots[i]
             degree_i = degree[i]
             polynomial_degree_i = polynomial_degree[i]
-            spline_basis[i] = hcat(BSplineBasis(knots_i, degree_i, predictor, polynomial_degree_i))
-            spline_basis[i] = spline_basis[i][:, 2:end]
-            X = hcat(X, spline_basis[i])
+            tprs_basis[i] = tprs_basis_matrix(predictor, knots_i, degree_i, polynomial_degree_i)
+            X = hcat(X, tprs_basis[i])
         end
     end
 
@@ -87,12 +86,7 @@ function fit_gam(formula::Union{Symbol, Expr}, data::DataFrame, family::Union{Sy
         X = hcat(X, dummy_encoder(data[term]))
     end
 
-    # Initialize the model coefficients to zeros
-    n_features = size(X, 2)
-    β = zeros(n_features)
-
     # Set the distribution based on the likelihood type
-
     if family === :gaussian
         dist = Normal()
     elseif family === :binomial
@@ -106,7 +100,6 @@ function fit_gam(formula::Union{Symbol, Expr}, data::DataFrame, family::Union{Sy
     end
 
     # If λ is not specified, optimize it using cross-validation
-
     if λ === nothing
         lambda_vals = logspace(-3, 3, 7)
         cv_scores = Vector{Float64}(undef, length(lambda_vals))
@@ -117,39 +110,53 @@ function fit_gam(formula::Union{Symbol, Expr}, data::DataFrame, family::Union{Sy
 
             for j in 1:n_folds
                 # Split the data into training and test sets
-
                 idx = foldind(data[y], n_folds, j)
                 X_train = X[.!idx, :]
                 y_train = data[y][.!idx]
                 X_test = X[idx, :]
                 y_test = data[y][idx]
 
-                # Compute the penalized log likelihood for the training data
+                # Compute the smoothness constraints for the smooth terms
+                G = Array{Float64}(undef, 0, 0)
+                for (k, term) in enumerate(smooth_terms)
+                    G_k = tprs_smoothness_matrix(tprs_basis[k], lambda_val)
+                    G = vcat(G, G_k)
+                end
 
-                res = optimize(β -> penalized_log_lik(X_train, y_train, β, dist, lambda_val, penalty_matrix), β, BFGS(), Optim.Options(show_trace=false))
-                β = res.minimizer
-                fold_log_lik[j] = log_lik(X_test, y_test, β, dist)
+                # Solve the penalized least squares problem to obtain the model coefficients
+                β = (X_train'X_train + lambda_val * G) \ X_train'y_train
+
+                # Compute the log likelihood for the test set
+                fold_log_lik[j] = sum(logpdf.(dist, y_test, X_test * β))
             end
 
-            # Compute the average cross-validated log likelihood
+            # Average the log likelihood across the folds
             cv_scores[i] = mean(fold_log_lik)
         end
 
-            # Select the λ value with the highest cross-validated log likelihood
-            λ = lambda_vals[argmax(cv_scores)]
+    # Choose the lambda value that maximizes the cross-validated log likelihood
+    λ = lambda_vals[argmax(cv_scores)]
+
+    # Compute the smoothness constraints for the smooth terms
+    G = Array{Float64}(undef, 0, 0)
+    for (i, term) in enumerate(smooth_terms)
+        G_i = tprs_smoothness_matrix(tprs_basis[i], λ)
+        G = vcat(G, G_i)
     end
 
-    # Compute the penalized log likelihood for the full dataset
-    res = optimize(β -> penalized_log_lik(X, data[y], β, dist, λ, penalty_matrix), β, BFGS(), Optim.Options(show_trace=false))
-    β = res.minimizer
+    # Solve the penalized least squares problem to obtain the model coefficients
+    β = (X'X + λ * G) \ X'y
 
-    # Compute the log likelihood and information criteria for the model
-    log_lik_val = log_lik(X, data[y], β, dist)
-    n_obs = size(X, 1)
-    n_params = size(X, 2)
-    aic_val = -2 * log_lik_val + 2 * n_params
-    bic_val = -2 * log_lik_val + n_params * log(n_obs)
+    # Compute the log likelihood of the model
+    log_lik = sum(logpdf.(dist, y, X * β))
 
-    # Return the fitted model
-    return GAMModel(formula, data, β, knots, degree, n_knots, family, λ, log_lik_val, aic_val, bic_val)
+    # Compute the AIC and BIC of the model
+    n_features = size(X, 2)
+    aic = -2 * log_lik + 2 * n_features
+    bic = -2 * log_lik + n_features * log(size(data, 1))
+
+    # Return the GAM model
+    mod = GAMModel(formula, data, β, knots, degree, polynomial_degree, family, λ, log_lik, aic, bic)
+    return mod
 end
+

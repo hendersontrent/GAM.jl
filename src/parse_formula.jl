@@ -10,63 +10,50 @@ Arguments:
 - `formula` : The model formula.
 - `data` : DataFrame of input data.
 """
-function parse_formula(data::DataFrame, formula::Union{Symbol, Expr})
-    if typeof(formula) == Symbol
-        return formula, [:Intercept], nothing, nothing, nothing
-    end
+function parse_formula(formula::String, data::DataFrame)
+    # Split the formula string into the left-hand side (response variable) and right-hand side (predictor formula)
+    lhs, rhs = split(formula, "~")
+    lhs = Symbol(rstrip(lhs)) # Remove trailing whitespace
+    rhs = lstrip(rhs) # Remove leading whitespace
+    rhs = filter(e->e∉"+",rhs) # Remove plus signs to only keep terms
+    rhs = filter(!=(""), split(rhs, " ")) # Remove empty strings
 
-    y = formula.lhs
-    terms = formula.rhs
+    # Initialize the lists of smooth terms, categorical variables, knots, and degrees
+    smooth_terms = Vector{Symbol}(undef, 0)
+    cat_vars = Vector{Symbol}(undef, 0)
+    knots = Vector{Union{Nothing, AbstractArray{T, 1}} where T<:Real}(undef, 0)
+    degree = Vector{Int}(undef, 0)
+    polynomial_degree = Vector{Int}(undef, 0)
 
-    # Initialize empty arrays for the smooth terms and their knots, degrees, and polynomial degrees
-    smooth_terms = []
-    knots = []
-    degree = []
-    n_knots = []
-    polynomial_degree = []
+    # Iterate over the terms in the predictor formula
+    for term in rhs
+        # Check if the term is a smooth term
+        if starts(term, "s(")
+            # Extract the variable name and optional arguments
+            var_name = Symbol(split(split(term, ",")[1], "(")[2])
+            parser = parse_smooth_term(term)
+            k = parser[1]
+            degree_i = parser[2]
+            knots_i = nothing
+            polynomial_degree_i = 0
 
-    # Iterate over the terms in the formula
-    for term in terms
-        if term.head == :call
-            # Check if the term is a smooth term
-            if term.args[1] == :s
-                # Extract the predictor variable and knots
-                predictor = term.args[2]
-                knots_arg = term.args[3]
-                # Set the default values for degree and polynomial degree
-                degree_val = 3
-                polynomial_degree_val = 1
-                # Check if the degree and polynomial degree are specified
-                for arg in term.args[4:end]
-                    if arg.head == :kw
-                        if arg.args[1] == :degree
-                            degree_val = arg.args[2]
-                        elseif arg.args[1] == :k
-                            polynomial_degree_val = arg.args[2]
-                        end
-                    end
-                end
-                # Append the predictor, knots, degree, and polynomial degree to the arrays
-                push!(smooth_terms, predictor)
-                push!(knots, knots_arg)
-                push!(degree, degree_val)
-                push!(polynomial_degree, polynomial_degree_val)
-            else
-                # Append the term to the smooth terms array
-                push!(smooth_terms, term)
+            # Check if knots were specified
+
+            if knots_i === nothing
+                # Estimate the knots using automatic smoothness estimation
+                knots_i = tprs_knots(data, lhs, var_name, k, degree_i, polynomial_degree_i)
             end
-        end
-    end
 
-    # Extract the categorical variables from the smooth terms
-    cat_vars = []
-    for term in smooth_terms
-        if !ismissing(data, term) && eltype(data[term]) <: Union{CategoricalValue, Missing}
+            # Add the smooth term to the list of smooth terms
+            push!(smooth_terms, var_name)
+            push!(knots, knots_i)
+            push!(degree, degree_i)
+            push!(polynomial_degree, polynomial_degree_i)
+        else
+            # Add the term to the list of categorical variables
+            term = Symbol(strip(term))
             push!(cat_vars, term)
         end
     end
-
-    # Return the response variable, smooth terms, categorical variables, knots, degrees, and polynomial degrees
-    return y, smooth_terms, cat_vars, knots, degree, polynomial_degree
+    return lhs, smooth_terms, cat_vars, knots, degree, polynomial_degree
 end
-    
