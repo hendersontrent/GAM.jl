@@ -1,4 +1,4 @@
-using Random, Distributions, RDatasets, Documenter, GAM
+using RDatasets, Documenter, GAM
 
 makedocs(
     format = Documenter.HTML(),
