@@ -1,23 +1,27 @@
 module GAM
 
-using LinearAlgebra, Distributions, BSplines, Optim, StatsBase, Plots, DataFrames
+using Random, FillArrays, Distributions, StatsPlots, GLM, Optim, BSplines, LinearAlgebra
 
-include("pen_log_lik.jl")
-include("cv_log_lik.jl")
-include("optimal_knots.jl")
-include("fit_gam.jl")
-include("plot_gam.jl")
-include("predict_gam.jl")
-include("summarise_gam.jl")
+include("QuantileBasis.jl")
+include("BasisMatrix.jl")
+include("diffm.jl")
+include("DifferenceMatrix.jl")
+include("PenaltyMatrix.jl")
+include("GCV.jl")
+include("OptimizeGCVLambda.jl")
+include("FitGAM.jl")
+include("GAMModel.jl")
+include("PlotGAM.jl")
 
-export pen_log_lik
-export cv_log_lik
-export optimal_knots
+export QuantileBasis
+export BasisMatrix
+export diffm
+export DifferenceMatrix
+export PenaltyMatrix
+export GCV
+export OptimizeGCVLambda
+export FitGAM
 export GAMModel
-export fit_gam
-export plot_gam
-export predict_gam
-export summarise_gam
-export summarize_gam
+export PlotGAM
 
 end

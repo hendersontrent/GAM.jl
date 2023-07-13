@@ -1,32 +1,38 @@
-using GAM
-using Test
-using RDatasets, DataFrames, Plots
+using StatisticalRethinking, Plots, GAM, Test
 
-# Get mtcars data
+# Reproduce analysis at https://yahrmason.github.io/bayes/gams-julia/
 
-mtcars = dataset("datasets", "mtcars")
-X = Matrix(mtcars[:, [:AM, :Cyl, :WT, :HP]])
-y = mtcars[:, :MPG]
+#-------------------- Set up data -----------------
+
+# Import the cherry_blossoms dataset
+
+data = CSV.read(sr_datadir("cherry_blossoms.csv"), DataFrame);
+
+# Drop records that have missing day of year values
+
+data = data[(data.doy .!= "NA"),:];
+
+# Convert day of year to numeric column
+
+data[!,:doy] = parse.(Float64,data[!,:doy]);
+
+# Create x and y variables
+
+x = data.year;
+y_mean = mean(data.doy);
+y = data.doy .- y_mean;
+
+#-------------------- Run tests -----------------
 
 @testset "GAM.jl" begin
-
-    # Fit GAM
-
-    model = fit_gam(X, y, :gaussian)
-    @test model isa GAMModel
-
-    # Return summary of GAM
-
-    summary = summary(model)
-    @test summary isa DataFrames.DataFrame
-
-    # Plot GAM for first predictor
     
-    p = plot_gam(model, X, y, 1)
+    # Core function
+
+    MyGAM = FitGAM(x, y; n_knots=15, degree=3)
+    @test MyGAM isa GAMModel
+
+    # Plotting function
+
+    p = PlotGAM(MyGAM; alpha=0.2)
     @test p isa Plots.Plot
-
-    # Predict with GAM
-    
-    preds = predict_gam(model, X, :mean)
-    @test preds isa Array
 end
