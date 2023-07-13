@@ -6,7 +6,7 @@ Usage:
 PlotGAM(model)
 ```
 Arguments:
-- `model` : `GAMModel` of the fitted GAM.
+- `model` : `GAMModel` containing the fitted GAM.
 """
 
 function PlotGAM(model::GAMModel; kwargs...)

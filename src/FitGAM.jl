@@ -6,8 +6,8 @@ Usage:
 FitGAM(X, y, n_knots, degree)
 ```
 Arguments:
-- `x` : `AbstractVector` of the predictor variable.
-- `y` : `AbstractVector` of the response variable.
+- `x` : `AbstractVector` containing the predictor variable.
+- `y` : `AbstractVector` containing the response variable.
 - `n_knots` : `Int64` denoting the number of knots to use in the spline. Defaults to half the length of `x`.
 - `degree` : `Int64` denoting the polynomial degree of the spline. Defaults to `3` for a cubic spline.
 """
