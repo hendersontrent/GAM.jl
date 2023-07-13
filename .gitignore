@@ -24,3 +24,7 @@ docs/site/
 Manifest.toml
 
 .vscode/*
+
+# MacOS files
+
+.DS_Store
