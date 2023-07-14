@@ -81,7 +81,7 @@ function FitGAM(formula::String, data::DataFrame; family=Normal(), link=canonica
 
             # Add to struct
 
-            predictorFit = NoSmoothData(variable, β_opt)
+            predictorFit = NoSmoothData(variable, β_opt[1])
 
             # Store in covariate array
             
