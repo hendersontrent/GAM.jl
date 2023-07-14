@@ -1,9 +1,9 @@
 """
-    FitGAM(x, y, n_knots, degree)
+    FitGAM(formula, data; family, link, optimizer)
 Computes a basic generalized additive model (GAM) on input data. An intercept is added by default.
 Usage:
 ```julia-repl
-FitGAM(X, y, n_knots, degree)
+FitGAM(formula, data; family, link, optimizer)
 ```
 Arguments:
 - `formula` : `String` containing the expression of the model. Continuous covariates are wrapped in s() like `mgcv` in R, where `s()` has 3 parts: name of column, `k`` (integer denoting number of knots), and `degree` (polynomial degree of the spline). An example expression is `"Y ~ s(MPG, k=5, degree=3) + WHT + s(TRL, k=5, degree=2)"`
@@ -97,7 +97,7 @@ function FitGAM(formula::String, data::DataFrame; family::Distribution=Gaussian(
 
     #---------------- Compute final GAM ---------------
 
-    # NEED TO CREATE THE `model` OBJECT HERE FOR BELOW
+    # NEED TO CREATE THE `model` OBJECT HERE FOR BELOW DOING THE ACTUAL ADDITIVE PROCESS
 
     # Return final object
 
