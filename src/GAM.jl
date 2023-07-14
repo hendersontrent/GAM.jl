@@ -1,6 +1,6 @@
 module GAM
 
-using Random, FillArrays, Distributions, StatsPlots, GLM, Optim, BSplines, LinearAlgebra
+using Random, FillArrays, DataFrames, Distributions, StatsPlots, GLM, Optim, BSplines, LinearAlgebra
 
 include("QuantileBasis.jl")
 include("BasisMatrix.jl")
@@ -12,6 +12,7 @@ include("OptimizeGCVLambda.jl")
 include("FitGAM.jl")
 include("GAMModel.jl")
 include("PlotGAM.jl")
+include("ParseFormula.jl")
 
 export QuantileBasis
 export BasisMatrix
@@ -23,5 +24,7 @@ export OptimizeGCVLambda
 export FitGAM
 export GAMModel
 export PlotGAM
+export GAMFormula
+export ParseFormula
 
 end
