@@ -34,7 +34,7 @@ function ParseFormula(formula::String)
     # whitespace and plus signs
     #--------------------------
 
-    vars = String.(collect(m.match for m in eachmatch(r"\s*\+?\s*(s\((:\w+),\s*k=(\d+),\s*degree=(\d+)\)|(:\w+))", formula)))
+    vars = String.(collect(m.match for m in eachmatch(r"\s*\+?\s*(s\((\w+),\s*k=(\d+),\s*degree=(\d+)\)|(\w+))", formula)))
     lhs = vars[1] # Response variable
     rhs = filter!(e -> e≠lhs, vars) # Covariates
 
