@@ -13,6 +13,7 @@ include("FitGAM.jl")
 include("GAMModel.jl")
 include("PlotGAM.jl")
 include("ParseFormula.jl")
+include("SmoothData.jl")
 
 export QuantileBasis
 export BasisMatrix
@@ -26,5 +27,7 @@ export GAMModel
 export PlotGAM
 export GAMFormula
 export ParseFormula
+export SmoothData
+export NoSmoothData
 
 end

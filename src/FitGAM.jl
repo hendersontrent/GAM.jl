@@ -24,6 +24,8 @@ function FitGAM(formula::String, data::DataFrame; family::Distribution=Gaussian(
 
     #---------------- Do spline operations for each covariate ---------------
 
+    covariateFits = Union{SmoothData, NoSmoothData}[]
+
     for i in 1:nrow(GAMForm.covariates)
 
         if GAMFom.covariates[i, 4] == true
@@ -48,7 +50,7 @@ function FitGAM(formula::String, data::DataFrame; family::Distribution=Gaussian(
             Xp_opt, yp_opt = PenaltyMatrix(Basis, λ_opt, x, y);
             tmp = DataFrame(Xp_opt = Xp_opt, yp_opt = yp_opt)
 
-            # Fit Optimized Spline
+            # Fit optimised spline
 
             if(family==Gaussian())
                 β_opt = coef(fit(LinearModel, @formula(yp_opt ~ Xp_opt), tmp))
@@ -56,20 +58,49 @@ function FitGAM(formula::String, data::DataFrame; family::Distribution=Gaussian(
                 β_opt = coef(fit(GeneralizedLinearModel, @formula(yp_opt ~ Xp_opt), tmp, family))
             end
         
-            # Define Optimized Spline Object
+            # Define optimised spline object
         
             Spline_opt = Spline(Basis, β_opt)
+
+            # Add to struct
+
+            predictorFit = SmoothData(variable, β_opt, λ_opt, Spline_opt)
+
+            # Store in covariate array
+
+            push!(covariateFits, predictorFit)
         else
-            xx
+            
+            # Extract components
+
+            variable = GAMForm.covariates[i, 1]
+            x = data[!, variable]
+            tmp = DataFrame(x = x, y = y)
+
+            # Fit statistical model
+
+            if(family==Gaussian())
+                β_opt = coef(fit(LinearModel, @formula(y ~ x), tmp))
+            else
+                β_opt = coef(fit(GeneralizedLinearModel, @formula(y ~ x), tmp, family))
+            end
+
+            # Add to struct
+
+            predictorFit = NoSmoothData(variable, β_opt)
+
+            # Store in covariate array
+            
+            push!(covariateFits, predictorFit)
         end
     end
 
     #---------------- Compute final GAM ---------------
 
-    #
+    # NEED TO CREATE THE `model` OBJECT HERE FOR BELOW
 
     # Return final object
 
-    outs = GAMModel(formula, data, λ_opt, Xp_opt, yp_opt, Spline_opt)
+    outs = GAMModel(formula, data, model, covariateFits)
     return(outs)
 end

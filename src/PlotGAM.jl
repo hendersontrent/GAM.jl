@@ -1,6 +1,6 @@
 """
     PlotGAM(model)
-Plots a fitted GAMModel object.
+Plots smooths for a fitted GAMModel object.
 Usage:
 ```julia-repl
 PlotGAM(model)
