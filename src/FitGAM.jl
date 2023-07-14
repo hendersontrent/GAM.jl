@@ -8,12 +8,12 @@ FitGAM(formula, data; family, link, optimizer)
 Arguments:
 - `formula` : `String` containing the expression of the model. Continuous covariates are wrapped in s() like `mgcv` in R, where `s()` has 3 parts: name of column, `k`` (integer denoting number of knots), and `degree` (polynomial degree of the spline). An example expression is `"Y ~ s(MPG, k=5, degree=3) + WHT + s(TRL, k=5, degree=2)"`
 - `data` : `DataFrame` containing the covariates and response variable to use.
-- `family` : `Distribution` denoting the likelihood to use. Defaults to `Gaussian()`.
+- `family` : `Distribution` denoting the likelihood to use. Must be one of the options in `GLM.jl`. Defaults to `Gaussian()`.
 - `link` : denoting the link function to use for `family`. Defaults to the canonical link of `family`.
 - `optimizer` : `Optim.jl` optimizer to use. Defaults to `Newton()`. Other common choices might be `GradientDescent()`, `BFGS()` or `LBFGS()`.
 """
 
-function FitGAM(formula::String, data::DataFrame; family::Distribution=Gaussian(), link=canonicallink(family), optimizer=Newton())
+function FitGAM(formula::String, data::DataFrame; family=Gaussian(), link=canonicallink(family), optimizer=Newton())
 
     # Add a column of ones to the dataframe for the intercept term and add to formula
 
