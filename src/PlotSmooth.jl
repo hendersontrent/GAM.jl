@@ -17,8 +17,8 @@ function PlotSmooth(mymodel::GAMModel; smooth_index::Int64=2, kwargs...)
     if typeof(mymodel.covariateFits[smooth_index]) == SmoothData
         p = scatter(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], mymodel.data[!, mymodel.y_var], label = "Data", color = :black; kwargs...)
         xlabel!(String(mymodel.covariateFits[smooth_index].variable))
-        ylabel!(String(y_var))
-        plot!(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], mymodel.covariateFits[smooth_index].Spline_opt_lower.(data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, fillrange = mymodel.covariateFits[smooth_index].Spline_opt_upper.(mymodel.data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, fillalpha = 0.2, pointalpha = 0.0, color = :grey, label = "CI")
+        ylabel!(String(mymodel.y_var))
+        plot!(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], mymodel.covariateFits[smooth_index].Spline_opt_lower.(mymodel.data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, fillrange = mymodel.covariateFits[smooth_index].Spline_opt_upper.(mymodel.data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, fillalpha = 0.2, pointalpha = 0.0, color = :grey, label = "CI")
         plot!(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], mymodel.covariateFits[smooth_index].Spline_opt.(mymodel.data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, color = :grey, linewidth = 2, label = "Optimal smooth λ = $(round(mymodel.covariateFits[smooth_index].λ_opt,digits=3))")
         return p 
     else
