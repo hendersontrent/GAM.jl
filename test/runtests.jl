@@ -1,4 +1,4 @@
-using Plots, GAM, Test
+using DataFrames, Plots, Distributions, Optim, GLM, GAM, Test
 
 #-------------------- Set up data -----------------
 
