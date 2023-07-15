@@ -15,7 +15,7 @@ function PlotSmooth(mymodel::GAMModel; smooth_index::Int64=2, kwargs...)
     # Check that the smooth_index is a smooth and not a discrete covariate
 
     if typeof(mymodel.covariateFits[smooth_index]) == SmoothData
-        p = scatter(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], y, label = "Data", color = :black; kwargs...)
+        p = scatter(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], mymodel.data[!, mymodel.y_var], label = "Data", color = :black; kwargs...)
         xlabel!(String(mymodel.covariateFits[smooth_index].variable))
         ylabel!(String(y_var))
         plot!(mymodel.data[!, mymodel.covariateFits[smooth_index].variable], mymodel.covariateFits[smooth_index].Spline_opt_lower.(data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, fillrange = mymodel.covariateFits[smooth_index].Spline_opt_upper.(mymodel.data[!, mymodel.covariateFits[smooth_index].variable]) .+ mymodel.covariateFits[1].β_opt, fillalpha = 0.2, pointalpha = 0.0, color = :grey, label = "CI")
