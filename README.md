@@ -21,6 +21,4 @@ Similar to `mgcv`, the `GAM.jl` implementation of GAMs represents the smooth fun
 
 ## Development notes
 
-`GAM.jl` is very much a work in progress. Currently, functionality is oriented towards a single predictor variable, but we hope to extend this to a full design matrix soon!
-
-Please check back for updates and new features!
+`GAM.jl` is very much a work in progress. Please check back for updates and new features or feel free to contribute yourself!
