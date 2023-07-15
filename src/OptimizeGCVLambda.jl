@@ -9,10 +9,10 @@ Arguments:
 - `Basis` : `BSplineBasis` containing the quantile B-spline basis.
 - `x` : `AbstractVector` containing the predictor variable.
 - `y` : `AbstractVector` containing the response variable.
-- `optimizer` : `Optim.jl` optimizer to use. Defaults to `Newton()`. Other common choices might be `GradientDescent()`, `BFGS()` or `LBFGS()`.
+- `optimizer` : `Optim.jl` optimizer to use. Defaults to `GradientDescent()`. Other common choices might be `BFGS()` or `LBFGS()`.
 """
 
-function OptimizeGCVLambda(Basis::BSplineBasis{Vector{Float64}}, x::AbstractVector, y::AbstractVector, optimizer=Newton())
+function OptimizeGCVLambda(Basis::BSplineBasis{Vector{Float64}}, x::AbstractVector, y::AbstractVector, optimizer=GradientDescent())
 
     # Optimization bounds 
 
