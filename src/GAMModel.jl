@@ -1,24 +1,20 @@
 """
-    GAMModel(x, y, λ_opt, Xp_opt, yp_opt, Spline_opt)
-Holds information relevant to the GAM model.
+    GAMModel(ModelFormula, y_var, data, model, covariateFits)
+Holds information relevant to the final fitted GAM model.
 
 Usage:
 ```julia-repl
-GAMModel(x, y, λ_opt, Xp_opt, yp_opt, Spline_opt)
+GAMModel(ModelFormula, y_var, data, model, covariateFits)
 ```
 Arguments:
-- `x` : `AbstractVector` containing the predictor variable.
-- `y` : `AbstractVector` containing the response variable.
-- `λ_opt` : `Float64` containing the optimised λ value.
-- `Xp_opt` : `AbstractMatrix` containing the penalty design matrix.
-- `yp_opt` : `AbstractVector` containing the penalty response variable.
-- `Spline_opt` : `Spline` containing the optimised spline object.
+- `ModelFormula` : `String` containing the expression of the model.
+- `y_var` : `Symbol` denoting the response variable column name.
+- `data` : `DataFrame` containing the covariates and response variable to use.
+- `covariateFits` : `Vector{Union{SmoothData, NoSmoothData}}` containing the coefficient, spline, and penalty information for each covariate.
 """
 struct GAMModel
-    x::AbstractVector
-    y::AbstractVector
-    λ_opt::Float64
-    Xp_opt::AbstractMatrix
-    yp_opt::AbstractVector
-    Spline_opt::Spline
+    ModelFormula::String
+    y_var::Symbol
+    data::DataFrame
+    covariateFits::Vector{Union{SmoothData, NoSmoothData}}
 end
