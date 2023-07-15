@@ -1,9 +1,9 @@
 """
-    FitGAM(ModelFormula, data; family, link, optimizer)
+    gam(ModelFormula, data; family, link, optimizer)
 Computes a basic generalized additive model (GAM) on input data. An intercept is added by default.
 Usage:
 ```julia-repl
-FitGAM(formula, data; family, link, optimizer)
+gam(formula, data; family, link, optimizer)
 ```
 Arguments:
 - `ModelFormula` : `String` containing the expression of the model. Continuous covariates are wrapped in s() like `mgcv` in R, where `s()` has 3 parts: name of column, `k`` (integer denoting number of knots), and `degree` (polynomial degree of the spline). An example expression is `"Y ~ s(MPG, k=5, degree=3) + WHT + s(TRL, k=5, degree=2)"`
@@ -13,7 +13,7 @@ Arguments:
 - `optimizer` : `Optim.jl` optimizer to use. Defaults to `GradientDescent()`. Other common choices might be `BFGS()` or `LBFGS()`.
 """
 
-function FitGAM(ModelFormula::String, data::DataFrame; family=Normal(), link=canonicallink(family), optimizer=GradientDescent())
+function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canonicallink(family), optimizer=GradientDescent())
 
     # Add a column of ones to the dataframe for the intercept term and add to formula
 
@@ -21,7 +21,8 @@ function FitGAM(ModelFormula::String, data::DataFrame; family=Normal(), link=can
     data = hcat(intercept, data)
     ModelFormula = split(ModelFormula, " ~ ")[1] * " ~ :Intercept + " * split(ModelFormula, " ~ ")[2]
     GAMForm = ParseFormula(ModelFormula)
-    y = data[!, GAMForm.y]
+    y_var = GAMForm.y
+    y = data[!, y_var]
 
     #---------------- Do spline operations for each covariate ---------------
 
@@ -57,15 +58,19 @@ function FitGAM(ModelFormula::String, data::DataFrame; family=Normal(), link=can
             GAMModelMatrix = hcat(y_tmp, X_tmp)
             cov_names = names(GAMModelMatrix)[2:end].|> Symbol
             f = Term(:yp_opt)~sum(Term.(cov_names))
-            β_opt = coef(glm(f, GAMModelMatrix, family, link))[2:end] # Need to find a way to remove the intercept...
-        
+            mod = glm(f, GAMModelMatrix, family, link)
+            β_opt = coef(mod)[2:end] # Need to find a way to remove the intercept...
+            β_opt_confint = confint(mod)[2:end, :]
+
             # Define optimised spline object
         
             Spline_opt = Spline(Basis, β_opt)
+            Spline_opt_lower = Spline(Basis, β_opt_confint[:, 1])
+            Spline_opt_upper = Spline(Basis, β_opt_confint[:, 2])
 
             # Add to struct
 
-            predictorFit = SmoothData(variable, β_opt, λ_opt, Spline_opt)
+            predictorFit = SmoothData(variable, β_opt, β_opt_confint, λ_opt, Spline_opt, Spline_opt_lower, Spline_opt_upper)
 
             # Store in covariate array
 
@@ -77,11 +82,13 @@ function FitGAM(ModelFormula::String, data::DataFrame; family=Normal(), link=can
             variable = GAMForm.covariates[i, 1]
             x = data[!, variable]
             GAMModelMatrix = DataFrame(x = x, y = y)
-            β_opt = coef(glm(@formula(y ~ x), GAMModelMatrix, family, link))[2:end] # Need to find a way to remove the intercept...
+            mod = glm(@formula(y ~ x), GAMModelMatrix, family, link) # Need to find a way to remove the intercept...
+            β_opt = coef(mod)[2:end] # Need to find a way to remove the intercept...
+            β_opt_confint = confint(mod)[2:end, :]
 
             # Add to struct
 
-            predictorFit = NoSmoothData(variable, β_opt[1])
+            predictorFit = NoSmoothData(variable, β_opt[1], β_opt_confint)
 
             # Store in covariate array
             
@@ -93,11 +100,10 @@ function FitGAM(ModelFormula::String, data::DataFrame; family=Normal(), link=can
 
     # Compute actual additive process
 
-    covariateFits.
-    model.Spline_opt.(model.x)
+
 
     # Return final object
 
-    outs = GAMModel(ModelFormula, data, model, covariateFits)
+    outs = GAMModel(ModelFormula, y_var, data, covariateFits)
     return(outs)
 end

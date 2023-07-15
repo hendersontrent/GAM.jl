@@ -9,9 +9,9 @@ include("DifferenceMatrix.jl")
 include("PenaltyMatrix.jl")
 include("GCV.jl")
 include("OptimizeGCVLambda.jl")
-include("FitGAM.jl")
+include("gam_fit.jl")
 include("GAMModel.jl")
-include("PlotGAM.jl")
+include("PlotSmooth.jl")
 include("ParseFormula.jl")
 include("SmoothData.jl")
 
@@ -22,9 +22,9 @@ export DifferenceMatrix
 export PenaltyMatrix
 export GCV
 export OptimizeGCVLambda
-export FitGAM
+export gam
 export GAMModel
-export PlotGAM
+export PlotSmooth
 export GAMFormula
 export ParseFormula
 export SmoothData

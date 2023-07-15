@@ -15,11 +15,11 @@ df = DataFrame(Girth = [8.3,8.6,8.8,10.5,10.7,10.8,11,11,11.1,11.2,11.3,11.4,11.
     
     # Core function
 
-    MyGAM = FitGAM("Volume ~ s(Girth, k=10, degree=3) + s(Height, k=10, degree=3)", df)
-    @test MyGAM isa GAMModel
+    tree_gam = gam("Volume ~ s(Girth, k=10, degree=3) + s(Height, k=10, degree=3)", df; family=Normal(), link=IdentityLink(), optimizer=GradientDescent())
+    @test tree_gam isa GAMModel
 
     # Plotting function
 
-    p = PlotGAM(MyGAM; alpha=0.2)
+    p = PlotSmooth(tree_gam; smooth_index=2)
     @test p isa Plots.Plot
 end
