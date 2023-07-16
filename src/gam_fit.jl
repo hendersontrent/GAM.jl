@@ -24,83 +24,77 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     y_var = GAMForm.y
     y = data[!, y_var]
 
-    #---------------- Do spline operations for each covariate ---------------
+    #---------------- Statistical calculations ---------------
 
-    covariateFits = Union{SmoothData, NoSmoothData}[]
+    # Set up smooth covariates
 
-    for i in 1:nrow(GAMForm.covariates)
+    smooth_covariates = GAMForm.covariates[GAMForm.covariates[:, :smooth] .== true, :]
+    smooth_cols = smooth_covariates[:, :variable]
+    smooth_df = select(data, smooth_cols)
+    smooth_x = Vector{Vector{Float64}}(undef, length(smooth_cols))
 
-        if GAMForm.covariates[i, 4] == true
-
-            # Extract spline components
-
-            variable = GAMForm.covariates[i, 1]
-            x = data[!, variable]
-            k = GAMForm.covariates[i, 2]
-            degree = GAMForm.covariates[i, 3] + 1 # Add 1 to degree to get the degree needed to fit what was specified
-
-            # Compute basis
-
-            Basis = QuantileBasis(x, k, degree)
-
-            # Compute optimised λ
-
-            λ_opt = OptimizeGCVLambda(Basis, x, y, optimizer)
-
-            # Build penalised design matrix
-
-            Xp_opt, yp_opt = PenaltyMatrix(Basis, λ_opt, x, y)
-
-            # Fit GLM for coefficients
-
-            X_tmp = DataFrame(Xp_opt, :auto)
-            y_tmp = DataFrame(yp_opt = yp_opt)
-            GAMModelMatrix = hcat(y_tmp, X_tmp)
-            cov_names = names(GAMModelMatrix)[2:end].|> Symbol
-            f = Term(:yp_opt)~sum(Term.(cov_names))
-            mod = glm(f, GAMModelMatrix, family, link)
-            β_opt = coef(mod)[2:end] # Need to find a way to remove the intercept...
-            β_opt_confint = confint(mod)[2:end, :]
-
-            # Define optimised spline object
-        
-            Spline_opt = Spline(Basis, β_opt)
-            Spline_opt_lower = Spline(Basis, β_opt_confint[:, 1])
-            Spline_opt_upper = Spline(Basis, β_opt_confint[:, 2])
-
-            # Add to struct
-
-            predictorFit = SmoothData(variable, β_opt, β_opt_confint, λ_opt, Spline_opt, Spline_opt_lower, Spline_opt_upper)
-
-            # Store in covariate array
-
-            push!(covariateFits, predictorFit)
-        else
-            
-            # Extract components and fit GLM for coefficient
-
-            variable = GAMForm.covariates[i, 1]
-            x = data[!, variable]
-            GAMModelMatrix = DataFrame(x = x, y = y)
-            mod = glm(@formula(y ~ x), GAMModelMatrix, family, link) # Need to find a way to remove the intercept...
-            β_opt = coef(mod)[2:end] # Need to find a way to remove the intercept...
-            β_opt_confint = confint(mod)[2:end, :]
-
-            # Add to struct
-
-            predictorFit = NoSmoothData(variable, β_opt[1], β_opt_confint)
-
-            # Store in covariate array
-            
-            push!(covariateFits, predictorFit)
-        end
+    for (i, col) in enumerate(smooth_cols)
+        smooth_x[i] = data[!, col]
     end
+
+    # Set up non-smooth covariates
+
+    non_smooth_covariates = GAMForm.covariates[GAMForm.covariates[:, :smooth] .== false, :]
+    non_smooth_cols = smooth_covariates[:, :variable]
+    non_smooth_df = select(data, non_smooth_cols)
+
+    #--------------------
+    # Handle smooth terms
+    #--------------------
+
+    BasisCalcs = BSplineBasis[]
+
+    for i in 1:nrow(smooth_covariates)
+        variable = smooth_covariates[i, :variable]
+        x_basis = data[!, variable]
+        k = smooth_covariates[i, :k]
+        degree = smooth_covariates[i, :degree] + 1 # Add 1 to degree to get the degree needed to fit what was specified
+        Basis = QuantileBasis(x_basis, k, degree)
+        push!(BasisCalcs, Basis)
+    end
+
+    # Compute basis and difference matrix
+
+    X = BasisMatrix.(BasisCalcs, smooth_x) # Basis Matrix
+    D = DifferenceMatrix.(BasisCalcs) # D penalty matrix
+
+    # Create a vector of penalties
+
+    λ = [10, 10]
+
+    # Build penalty design matrix
+
+    X_p = Matrix(
+        vcat(
+            # Column bind the Basis Matricies
+            hcat(X...), 
+            # Create a block diagonal matrix of penalized differences
+            blockdiag((sqrt.(λ).*sparse.(D))...)
+        )
+    )
+
+    # Create augmented penalty response
+
+    y_p = vcat(y, repeat([0],sum(first.(size.(D)))))
+
+    # Fit GLM
+
+    #------------------------
+    # Handle non-smooth terms
+    #------------------------
+
+    #
 
     #---------------- Compute final GAM ---------------
 
     # Compute actual additive process
 
-
+    #
 
     # Return final object
 

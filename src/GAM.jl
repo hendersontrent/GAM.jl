@@ -1,6 +1,6 @@
 module GAM
 
-using Random, FillArrays, DataFrames, Distributions, StatsPlots, GLM, Optim, BSplines, LinearAlgebra
+using Random, FillArrays, SparseArrays, DataFrames, Distributions, StatsPlots, GLM, Optim, BSplines, LinearAlgebra
 
 include("QuantileBasis.jl")
 include("BasisMatrix.jl")
