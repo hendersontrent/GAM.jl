@@ -9,7 +9,7 @@ Arguments:
 - `ModelFormula` : `String` containing the expression of the model. Continuous covariates are wrapped in s() like `mgcv` in R, where `s()` has 3 parts: name of column, `k`` (integer denoting number of knots), and `degree` (polynomial degree of the spline). An example expression is `"Y ~ s(MPG, k=5, degree=3) + WHT + s(TRL, k=5, degree=2)"`
 - `data` : `DataFrame` containing the covariates and response variable to use.
 - `family` : `Distribution` denoting the likelihood to use. Must be one of the options in `GLM.jl`. Defaults to `Normal()`.
-- `link` : denoting the link function to use for `family`. Defaults to the canonical link of `family`.
+- `link` : denotes the link function to use for `family`. Defaults to the canonical link of `family`.
 - `optimizer` : `Optim.jl` optimizer to use. Defaults to `GradientDescent()`. Other common choices might be `BFGS()` or `LBFGS()`.
 """
 
@@ -80,24 +80,17 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
 
     # Create augmented penalty response
 
-    y_p = vcat(y, repeat([0],sum(first.(size.(D)))))
+    y_p = vcat(y, repeat([0], sum(first.(size.(D)))))
 
     # Fit GLM
 
-    #------------------------
-    # Handle non-smooth terms
-    #------------------------
-
-    #
-
-    #---------------- Compute final GAM ---------------
-
-    # Compute actual additive process
-
-    #
+    GAMMatrix = DataFrame(X_p, :auto)
+    y_tmp = DataFrame(y = y_p)
+    GAMMatrix = hcat(y_tmp, GAMMatrix)
+    mod = FitGLM(GAMMatrix, family, link)
 
     # Return final object
 
-    outs = GAMModel(ModelFormula, y_var, data, covariateFits)
+    outs = GAMModel(ModelFormula, y_var, data, model)
     return(outs)
 end

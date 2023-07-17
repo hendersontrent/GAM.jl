@@ -11,6 +11,7 @@ include("GCV.jl")
 include("OptimizeGCVLambda.jl")
 include("ParseFormula.jl")
 include("SmoothData.jl")
+include("FitGLM.jl")
 include("GAMModel.jl")
 include("gam_fit.jl")
 include("PlotSmooth.jl")
@@ -28,6 +29,7 @@ export GAMFormula
 export ParseFormula
 export SmoothData
 export NoSmoothData
+export FitGLM
 export gam
 
 end
