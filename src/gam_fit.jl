@@ -24,33 +24,23 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     y_var = GAMForm.y
     y = data[!, y_var]
 
-    #------------ Build penalised matrices -----------
+    #------------ Handle smooth terms -----------
 
-    covariateFits = Union{SmoothData, NoSmoothData}[]
-
+    smoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== true, :]
     BasisMatrices = []
     Differences = []
-    λs = []
 
-    for i in 1:nrow(GAMForm.covariates)
-        if lookup[i, 4] == true
-            col_data = data[!, GAMForm.covariates[i, 1]]
-            knots = quantile(col_data, range(0, 1; length = lookup[i, 2]))
-            basis = BSplineBasis(GAMForm.covariates[i, 3], knots)
-            X = BasisMatrix(basis, col_data) # Basis Matrix
-            D = DifferenceMatrix(basis)
-            λ = OptimizeGCVLambda(basis, col_data, data[:, y_var], optimizer)
-            push!(BasisMatrices, X)
-            push!(Differences, D)
-            push!(λs, λ)
-        else
-            push!(BasisMatrices, data[!, lookup[i, 1]])
-            D = diffm(diagm(0 => ones(length(data[!, lookup[i, 1]]))), 1, 2)
-            λ = 1
-            push!(Differences, D)
-            push!(λs, λ)
-        end
+    for i in 1:nrow(smoothCovs)
+        col_data = data[!, smoothCovs[i, 1]]
+        knots = quantile(col_data, range(0, 1; length = smoothCovs[i, 2]))
+        basis = BSplineBasis(smoothCovs[i, 3], knots)
+        X = BasisMatrix(basis, col_data)
+        D = DifferenceMatrix(basis)
+        push!(BasisMatrices, X)
+        push!(Differences, D)
     end
+
+    λs = OptimizeGCVLambda(BasisMatrices, Differences, data[:, y_var], optimizer)
 
     # Build penalised design matrix
 
@@ -66,6 +56,16 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     # Build augmented penalty response variable
 
     y_p = vcat(y, repeat([0], sum(first.(size.(Differences)))))
+
+    #------------ Add non-smooth terms -----------
+
+    nonSmoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== false, :]
+
+    # MORE HERE
+
+    # Append matricies
+
+
 
     #------------ Fit model -----------
 

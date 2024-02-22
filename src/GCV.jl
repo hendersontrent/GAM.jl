@@ -1,25 +1,29 @@
 """
-    GCV(param, Basis, x, y)
+    GCV(param, BasisMatrices, y, Differences)
 Perform generalised cross validation to optimise λ (penalty).
 Usage:
 ```julia-repl
-GCV(param, Basis, x, y)
+GCV(param, BasisMatrices, y, Differences)
 ```
 Arguments:
 - `param` : `AbstractVector` denoting the parameter to be optimised using GCV.
-- `Basis` : `BSplineBasis` containing the quantile B-spline basis.
-- `x` : `AbstractVector` containing the predictor variable.
+- `BasisMatrices` : `Vector` containing the quantile B-spline basis matrices.
 - `y` : `AbstractVector` containing the response variable.
+- `Differences` : `AbstractVector` containing the difference matrices.
 """
 
-function GCV(param::AbstractVector, Basis::BSplineBasis{Vector{Float64}}, x::AbstractVector, y::AbstractVector)
-    n = length(Basis.breakpoints)
-    Xp, yp = PenaltyMatrix(Basis, param[1], x, y)
-    β = coef(lm(Xp,yp))
-    H = Xp*inv(Xp'Xp)Xp' # Hat matrix
-    trF = sum(diag(H)[1:n])
-    y_hat = Xp*β
-    rss = sum((yp-y_hat)[1:n].^2) # Residual sums of squares
-    gcv = n*rss/(n-trF)^2
+function GCV(param::AbstractVector, BasisMatrices::AbstractVector, y::AbstractVector, Differences)
+    n = length(y)
+    k = length(BasisMatrices)
+    lambdas = param[1:k]
+    penalties = sum([λ .* D for (λ, D) in zip(lambdas, Differences)])
+    X = hcat(BasisMatrices...)
+    XtX = X'X
+    XtY = X'y
+    H = X*inv(XtX + penalties)*X' # Hat matrix
+    trF = sum(diag(H))
+    y_hat = X*inv(XtX + penalties)*XtY
+    rss = sum((y - y_hat).^2) # Residual sums of squares
+    gcv = n*rss/(n - trF)^2
     return gcv
 end

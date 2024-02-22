@@ -7,7 +7,7 @@ Usage:
 ModelFit()
 ```
 Arguments:
-- `ModelFormula` : `XX` XX.
+- `XX` : `XX` XX.
 """
 struct ModelFit
     #
