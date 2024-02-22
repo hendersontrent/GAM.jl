@@ -1,6 +1,6 @@
 """
     gam(ModelFormula, data; family, link, optimizer)
-Computes a basic generalized additive model (GAM) on input data. An intercept is added by default.
+Computes a generalized additive model (GAM). An intercept is added by default.
 Usage:
 ```julia-repl
 gam(formula, data; family, link, optimizer)
