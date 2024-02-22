@@ -24,86 +24,71 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     y_var = GAMForm.y
     y = data[!, y_var]
 
-    #---------------- Do spline operations for each covariate ---------------
+    #------------ Build penalised matrices -----------
 
     covariateFits = Union{SmoothData, NoSmoothData}[]
 
+    BasisMatrices = []
+    Differences = []
+    λs = []
+
     for i in 1:nrow(GAMForm.covariates)
-
-        if GAMForm.covariates[i, 4] == true
-
-            # Extract spline components
-
-            variable = GAMForm.covariates[i, 1]
-            x = data[!, variable]
-            k = GAMForm.covariates[i, 2]
-            degree = GAMForm.covariates[i, 3] + 1 # Add 1 to degree to get the degree needed to fit what was specified
-
-            # Compute basis
-
-            Basis = QuantileBasis(x, k, degree)
-
-            # Compute optimised λ
-
-            λ_opt = OptimizeGCVLambda(Basis, x, y, optimizer)
-
-            # Build penalised design matrix
-
-            Xp_opt, yp_opt = PenaltyMatrix(Basis, λ_opt, x, y)
-
-            # Fit GLM for coefficients
-
-            X_tmp = DataFrame(Xp_opt, :auto)
-            y_tmp = DataFrame(yp_opt = yp_opt)
-            GAMModelMatrix = hcat(y_tmp, X_tmp)
-            cov_names = names(GAMModelMatrix)[2:end].|> Symbol
-            f = Term(:yp_opt)~sum(Term.(cov_names))
-            mod = glm(f, GAMModelMatrix, family, link)
-            β_opt = coef(mod)[2:end] # Need to find a way to remove the intercept...
-            β_opt_confint = confint(mod)[2:end, :]
-
-            # Define optimised spline object
-        
-            Spline_opt = Spline(Basis, β_opt)
-            Spline_opt_lower = Spline(Basis, β_opt_confint[:, 1])
-            Spline_opt_upper = Spline(Basis, β_opt_confint[:, 2])
-
-            # Add to struct
-
-            predictorFit = SmoothData(variable, β_opt, β_opt_confint, λ_opt, Spline_opt, Spline_opt_lower, Spline_opt_upper)
-
-            # Store in covariate array
-
-            push!(covariateFits, predictorFit)
+        if lookup[i, 4] == true
+            col_data = data[!, GAMForm.covariates[i, 1]]
+            knots = quantile(col_data, range(0, 1; length = lookup[i, 2]))
+            basis = BSplineBasis(GAMForm.covariates[i, 3], knots)
+            X = BasisMatrix(basis, col_data) # Basis Matrix
+            D = DifferenceMatrix(basis)
+            λ = OptimizeGCVLambda(basis, col_data, data[:, y_var], optimizer)
+            push!(BasisMatrices, X)
+            push!(Differences, D)
+            push!(λs, λ)
         else
-            
-            # Extract components and fit GLM for coefficient
-
-            variable = GAMForm.covariates[i, 1]
-            x = data[!, variable]
-            GAMModelMatrix = DataFrame(x = x, y = y)
-            mod = glm(@formula(y ~ x), GAMModelMatrix, family, link) # Need to find a way to remove the intercept...
-            β_opt = coef(mod)[2:end] # Need to find a way to remove the intercept...
-            β_opt_confint = confint(mod)[2:end, :]
-
-            # Add to struct
-
-            predictorFit = NoSmoothData(variable, β_opt[1], β_opt_confint)
-
-            # Store in covariate array
-            
-            push!(covariateFits, predictorFit)
+            push!(BasisMatrices, data[!, lookup[i, 1]])
+            D = diffm(diagm(0 => ones(length(data[!, lookup[i, 1]]))), 1, 2)
+            λ = 1
+            push!(Differences, D)
+            push!(λs, λ)
         end
     end
 
-    #---------------- Compute final GAM ---------------
+    # Build penalised design matrix
 
-    # Compute actual additive process
+    X_p = Matrix(
+        vcat(
+            # cbind the Basis Matricies
+            hcat(BasisMatrices...), 
+            # create a block diagonal matrix of penalized differences
+            blockdiag((sqrt.(λs).*sparse.(Differences))...)
+        )
+    )
 
+    # Build augmented penalty response variable
 
+    y_p = vcat(y, repeat([0], sum(first.(size.(Differences)))))
+
+    #------------ Fit model -----------
+
+    # Prepare single dataset
+
+    trial_df = hcat(y_p, X_p)
+    trial_df = DataFrame(trial_df, :auto)
+    rename!(trial_df, :x1 => :y)
+
+    # Generate dynamic formula with intercept removed since we manually specify it
+
+    f = @eval(@formula($(Meta.parse("y ~ 0 + " * join(names(trial_df[:, Not(:y)]), " + ")))))
+
+    # Fit model
+
+    mod = glm(f, trial_df, family, link)
+
+    #------------ Generate GAM object -----------
+
+    ModelInformation = ModelFit()
 
     # Return final object
 
-    outs = GAMModel(ModelFormula, y_var, data, covariateFits)
+    outs = GAMModel(ModelFormula, data, y_var, ModelInformation)
     return(outs)
 end
