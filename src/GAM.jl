@@ -12,7 +12,6 @@ include("ParseFormula.jl")
 include("GAMModel.jl")
 include("gam_fit.jl")
 
-export QuantileBasis
 export BasisMatrix
 export diffm
 export DifferenceMatrix
