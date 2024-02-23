@@ -24,7 +24,15 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     y_var = GAMForm.y
     y = data[!, y_var]
 
-    #------------ Handle smooth terms -----------
+    #------------ Penalty optimisation procedure -----------
+
+    # Track which columns correspond to which predictor
+
+    ###
+
+    #--------------------
+    # Handle smooth terms
+    #--------------------
 
     smoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== true, :]
     BasisMatrices = []
@@ -40,42 +48,61 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
         push!(Differences, D)
     end
 
+    #------------------------
+    # Handle non-smooth terms
+    #------------------------
+
+    nonSmoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== false, :]
+
+    # Create identity matrices for Differences
+
+    DiffsNoSmooth = []
+
+    for i in 1:nrow(nonSmoothCovs)
+        Identity = I(size(data)[1])
+        push!(DiffsNoSmooth, Identity)
+    end
+
+    #---------------------
+    # Matrix concatenation
+    #---------------------
+
+    ###
+
+    #------------------------------
+    # Actual optimisation procedure
+    #------------------------------
+
     λs = OptimizeGCVLambda(BasisMatrices, Differences, data[:, y_var], optimizer)
 
+    #------------------------------
     # Build penalised design matrix
-
+    #------------------------------
+    
     X_p = Matrix(
         vcat(
             # cbind the Basis Matricies
             hcat(BasisMatrices...), 
             # create a block diagonal matrix of penalized differences
             blockdiag((sqrt.(λs).*sparse.(Differences))...)
+            )
         )
-    )
 
+    #------------------------------------------
     # Build augmented penalty response variable
+    #------------------------------------------
 
     y_p = vcat(y, repeat([0], sum(first.(size.(Differences)))))
 
-    #------------ Add non-smooth terms -----------
+    #------------ Model fit -----------
 
-    nonSmoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== false, :]
-
-    # MORE HERE
-
-    # Append matricies
-
-
-
-    #------------ Fit model -----------
-
-    # Prepare single dataset
+    # Prepare single dataset in a DataFrame format for GLM.jl
 
     trial_df = hcat(y_p, X_p)
     trial_df = DataFrame(trial_df, :auto)
     rename!(trial_df, :x1 => :y)
 
-    # Generate dynamic formula with intercept removed since we manually specify it
+    # Generate dynamic formula with intercept removed since we manually added it earlier
 
     f = @eval(@formula($(Meta.parse("y ~ 0 + " * join(names(trial_df[:, Not(:y)]), " + ")))))
 
