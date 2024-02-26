@@ -17,63 +17,39 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
 
     # Add a column of ones to the dataframe for the intercept term and add to formula
 
-    intercept = DataFrame(Intercept = ones(size(data, 1)))
-    data = hcat(intercept, data)
-    ModelFormula = split(ModelFormula, " ~ ")[1] * " ~ :Intercept + " * split(ModelFormula, " ~ ")[2]
+    #intercept = DataFrame(Intercept = ones(size(data, 1)))
+    #data = hcat(intercept, data)
+    #ModelFormula = split(ModelFormula, " ~ ")[1] * " ~ :Intercept + " * split(ModelFormula, " ~ ")[2]
+    ModelFormula = split(ModelFormula, " ~ ")[1] * " ~ " * split(ModelFormula, " ~ ")[2]
     GAMForm = ParseFormula(ModelFormula)
     y_var = GAMForm.y
     y = data[!, y_var]
 
     #------------ Penalty optimisation procedure -----------
 
-    # Track which columns correspond to which predictor
+    X = data[:, GAMForm.covariates.variable]
+    x = columns_to_vector(X)
+    basisArgs = Tuple.(eachrow(GAMForm.covariates[:, 2:3]))
+    Basis = []
 
-    ###
-
-    #--------------------
-    # Handle smooth terms
-    #--------------------
-
-    smoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== true, :]
-    BasisMatrices = []
-    Differences = []
-
-    for i in 1:nrow(smoothCovs)
-        col_data = data[!, smoothCovs[i, 1]]
-        knots = quantile(col_data, range(0, 1; length = smoothCovs[i, 2]))
-        basis = BSplineBasis(smoothCovs[i, 3], knots)
-        X = BasisMatrix(basis, col_data)
-        D = DifferenceMatrix(basis)
-        push!(BasisMatrices, X)
-        push!(Differences, D)
+    for i in 1:length(x)
+        push!(Basis, QuantileBasis(x[i], basisArgs[i]...))
     end
 
-    #------------------------
-    # Handle non-smooth terms
-    #------------------------
+    BasisMatrices = BasisMatrix.(Basis, x)
+    Differences = DifferenceMatrix.(Basis)
 
-    nonSmoothCovs = GAMForm.covariates[GAMForm.covariates.smooth .== false, :]
+    # Optimise for all λs
 
-    # Create identity matrices for Differences
+    k = length(BasisMatrices)
+    lower = zeros(k)
+    upper = fill(Inf, k)
+    initial_lambda = fill(1.0, k)
 
-    DiffsNoSmooth = []
-
-    for i in 1:nrow(nonSmoothCovs)
-        Identity = I(size(data)[1])
-        push!(DiffsNoSmooth, Identity)
-    end
-
-    #---------------------
-    # Matrix concatenation
-    #---------------------
-
-    ###
-
-    #------------------------------
-    # Actual optimisation procedure
-    #------------------------------
-
-    λs = OptimizeGCVLambda(BasisMatrices, Differences, data[:, y_var], optimizer)
+    res = Optim.optimize(
+        lambdas -> GCV(lambdas, BasisMatrices, y, Differences), 
+        lower, upper, initial_lambda, 
+    )
 
     #------------------------------
     # Build penalised design matrix
