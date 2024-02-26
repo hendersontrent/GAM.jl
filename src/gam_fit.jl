@@ -32,7 +32,7 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     basisArgs = Tuple.(eachrow(GAMForm.covariates[:, 2:3]))
     Basis = []
 
-    for i in 1:length(x)
+    for i in 1:size(x)[1]
         push!(Basis, QuantileBasis(x[i], basisArgs[i]...))
     end
 
