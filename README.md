@@ -1,5 +1,5 @@
 # GAM.jl
-Fit, evaluate, and visualise generalised additive models (GAMs) in native Julia
+Fit generalised additive models (GAMs) in native Julia
 
 ## Motivation
 

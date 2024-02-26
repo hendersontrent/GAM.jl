@@ -49,6 +49,7 @@ function gam(ModelFormula::String, data::DataFrame; family=Normal(), link=canoni
     res = Optim.optimize(
         lambdas -> GCV(lambdas, BasisMatrices, y, Differences), 
         lower, upper, initial_lambda, 
+        Fminbox(optimizer)
     )
 
     #------------------------------
