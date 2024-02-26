@@ -47,13 +47,13 @@ function GCV(param::AbstractVector, BasisMatrices::AbstractVector, y::AbstractVe
 
     # Compute GCV
 
-    b = X \ Y # coefficients
+    b = X \ Y # Coefficients
     H = X * inv(X' * X) * X' # Hat Matrix
     trA = sum(diag(H)[1:n]) # EDF
     y_hat = X * b # Fitted values
-    rsd = y - y_hat[1:n] # residuals
-    rss = sum(rsd.^2) # residual SS
-    sig_hat = rss/(n-trA) # residual variance
+    rsd = y - y_hat[1:n] # Residuals
+    rss = sum(rsd.^2) # Residual SS
+    sig_hat = rss/(n-trA) # Residual variance
     gcv = sig_hat*n/(n-trA) # GCV score
     return gcv
 end
