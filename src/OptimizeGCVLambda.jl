@@ -1,31 +1,28 @@
 """
-    OptimizeGCVLambda(Basis, x, y)
+    OptimizeGCVLambda(BasisMatrices, Differences, y, optimizer)
 Actual optimisation algorithm called within the generalised cross validation procedure.
 Usage:
 ```julia-repl
-OptimizeGCVLambda(Basis, x, y)
+OptimizeGCVLambda(BasisMatrices, Differences, y, optimizer)
 ```
 Arguments:
-- `Basis` : `BSplineBasis` containing the quantile B-spline basis.
-- `x` : `AbstractVector` containing the predictor variable.
+- `BasisMatrices` : `BSplineBasis` containing the quantile B-spline basis.
+- `Differences` : `AbstractVector` containing the difference matrices.
 - `y` : `AbstractVector` containing the response variable.
 - `optimizer` : `Optim.jl` optimizer to use. Defaults to `GradientDescent()`. Other common choices might be `BFGS()` or `LBFGS()`.
 """
 
-function OptimizeGCVLambda(Basis::BSplineBasis{Vector{Float64}}, x::AbstractVector, y::AbstractVector, optimizer=GradientDescent())
-
-    # Optimization bounds 
-
-    lower = [0]
-    upper = [Inf]
-    initial_lambda = [1.0]
-
-    # Run Optimization
+function OptimizeGCVLambda(BasisMatrices::AbstractVector, Differences::AbstractVector, y::AbstractVector, optimizer=GradientDescent())
+    k = length(BasisMatrices)
+    lower = zeros(k)
+    upper = fill(Inf, k)
+    initial_lambda = fill(1.0, k)
 
     res = Optim.optimize(
-        lambda -> GCV(lambda, Basis, x, y), 
+        lambdas -> GCV(lambdas, BasisMatrices, y, Differences), 
         lower, upper, initial_lambda, 
         Fminbox(optimizer)
     )
-    return Optim.minimizer(res)[1]
+
+    return Optim.minimizer(res)
 end
