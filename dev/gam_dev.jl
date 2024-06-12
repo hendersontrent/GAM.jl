@@ -1,39 +1,70 @@
 using Distributions, RDatasets, GLM, Optim, BSplines, LinearAlgebra
 using DataFrames, CSV, Plots, Optim
 
-df = CSV.read("julia/2023-06-21-gams-julia/engine.csv", DataFrame)
-y = df.wear; x = [df.size]
-BasisArgs = [(15,4)]
+identity(x) = x
+logit(p) = log(p/(1-p))
+
+# df = CSV.read("dev/engine.csv", DataFrame)
+# y = df.wear; x = [df.size]
+# BasisArgs = [(15,4)]
 
 df = dataset("datasets", "trees");
 x = [df.Girth, df.Height]
 y = df.Volume
-BasisArgs = [(5, 4), (5,4)]
+sp = [2,2]
+BasisArgs = [(10, 2), (10,2)]
+
+Families = Dict(
+    "Normal" => Dict(
+        "Name" => "Normal",
+        "Distribution" => Normal,
+        "Link" => identity,
+        "InverseLink" => identity
+    ),
+    "Gamma" => Dict(
+        "Name" => "Gamma",
+        "Distribution" => Gamma,
+        "Link" => log,
+        "InverseLink" => exp
+    ),
+    "Poisson" => Dict(
+        "Name" => "Poisson",
+        "Distribution" => Poisson,
+        "Link" => log,
+        "InverseLink" => exp
+    )
+)
 
 mutable struct GAMData
     y::AbstractArray
     x::AbstractArray
-    BasisArgs::Array{Tuple{Int,Int}}
     Basis::AbstractArray{BSplineBasis}
-    BasisMatrix::AbstractArray
-    BasisMatrixColMeans::AbstractArray
-    CoefIndex::AbstractArray
-    Penalty::AbstractArray
+    Family::Dict
     Coef::AbstractArray
-    Fit::Bool
+    ColMeans::AbstractArray
+    CoefIndex::AbstractArray
+    Fitted::AbstractArray
+    Diagnostics::Dict
 
-    function GAMData(y::AbstractArray, x::AbstractArray, BasisArgs::Array{Tuple{Int,Int}})
-        Basis = map((xi, argi) -> BuildQuantileBasis(xi, argi[1], argi[2]), x, BasisArgs)
-        BasisMatrix = map(BuildBasisMatrix, Basis, x)
-        BasisMatrixColMeans = BuildBasisMatrixColMeans(BasisMatrix)
-        CoefIndex = BuildCoefIndex(BasisMatrix)
-        Penalty = fill(nothing, length(x))
-        Coef = fill(nothing, 1 + sum(size.(BasisMatrix,1)))
-        new(
-            y, x, BasisArgs, Basis, BasisMatrix, 
-            BasisMatrixColMeans, CoefIndex, Penalty, Coef, false
-        )
+    function GAMData(
+        y::AbstractArray,
+        x::AbstractArray,
+        Basis::AbstractArray,
+        Family::Dict,
+        Coef::AbstractArray,
+        ColMeans::AbstractArray,
+        CoefIndex::AbstractArray,
+        Fitted::AbstractArray,
+        Diagnostics::Dict
+    )
+        new(y, x, Basis, Family, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
     end
+end
+
+function BuildUniformBasis(x::Vector, n_knots::Int64, order::Int64)
+    KnotsList = range(minimum(x), maximum(x), length = n_knots);
+    Basis = BSplineBasis(order, KnotsList);
+    return Basis
 end
 
 function BuildQuantileBasis(x::Vector, n_knots::Int64, order::Int64)
@@ -42,9 +73,11 @@ function BuildQuantileBasis(x::Vector, n_knots::Int64, order::Int64)
     return Basis
 end
 
-Basis = map((xi, argi) -> BuildQuantileBasis(xi, argi[1], argi[2]), x, BasisArgs)
 
-# Build a Matrix representation of the Basis
+Basis = map((xi, argi) -> BuildUniformBasis(xi, argi[1], argi[2]), x, BasisArgs)
+
+plot(Basis[1])
+
 function BuildBasisMatrix(Basis::BSplineBasis, x::AbstractVector)
     splines = vec(
         mapslices(
@@ -57,27 +90,6 @@ function BuildBasisMatrix(Basis::BSplineBasis, x::AbstractVector)
     return X 
 end
 
-X = map(BuildBasisMatrix, Basis, x)
-
-function BuildBasisMatrixColMeans(BasisMatrix::AbstractArray)
-    # Calculate means of each column
-    return mean.(X, dims=1)
-end
-
-colMeans = BuildBasisMatrixColMeans(X)
-
-function BuildCoefIndex(BasisMatrix::AbstractArray)
-    ix = [1:1]
-    ix_end = cumsum(vcat([1], size.(BasisMatrix,2)))
-    append!(ix, [ix_end[i-1]+1:ix_end[i] for i in 2:length(ix_end)])
-    return ix[2:end]
-end
-
-CoefIndex = BuildCoefIndex(X)
-
-gamData = GAMData(y, x, BasisArgs)
-
-
 # General Function to take differences of Matrices
 function diffm(A::AbstractVecOrMat, dims::Int64, differences::Int64)
     out = A
@@ -89,7 +101,8 @@ end
 
 # Difference Matrix
 # Note we take the difference twice.
-function BuildDifferenceMatrix(Basis::BSplineBasis{Vector{Float64}})
+function BuildDifferenceMatrix(Basis::BSplineBasis)
+    #nk = length(Basis.breakpoints)
     D = diffm(
         diagm(0 => ones(length(Basis))),
         1, # matrix dimension
@@ -97,8 +110,6 @@ function BuildDifferenceMatrix(Basis::BSplineBasis{Vector{Float64}})
     )
     return D
 end
-
-D = map(BuildDifferenceMatrix, gamData.Basis)
 
 function dcat(matrices)
 
@@ -129,124 +140,228 @@ function dcat(matrices)
     return final_matrix
 end
 
+function BuildBasisMatrixColMeans(BasisMatrix::AbstractArray)
+    # Calculate means of each column
+    return mean(BasisMatrix, dims=1)
+end
+
 function CenterBasisMatrix(BasisMatrix::AbstractMatrix, BasisMatrixColMeans::AbstractArray)
     return BasisMatrix .- BasisMatrixColMeans
     #return map((c, m) -> (c .- m), gamDataBasisMatrix, gamDataBasisMatrixColMeans)
 end
 
-X = map(CenterBasisMatrix, gamData.BasisMatrix, gamData.BasisMatrixColMeans)
+function DropCol(X::AbstractMatrix, ix::Int)
+    cols = [1:size(X,2);]
+    deleteat!(cols, ix)
+    return X[:, cols]
+end
 
-penalties = repeat([exp(1.0)], length(gamData.x))
-function BuildPenaltyMatrix(gamData::GAMData, penalties::AbstractVector)
+function BuildCoefIndex(BasisMatrix::AbstractArray)
+    ix = [1:1]
+    ix_end = cumsum(vcat([1], size.(BasisMatrix,2)))
+    append!(ix, [ix_end[i-1]+1:ix_end[i] for i in 2:length(ix_end)])
+    return ix[2:end]
+end
 
-    n = length(gamData.y)
-    X = map(CenterBasisMatrix, gamData.BasisMatrix, gamData.BasisMatrixColMeans)
-    D = map(BuildDifferenceMatrix, gamData.Basis)
-    Dp = dcat(map((p, d) -> (sqrt(p) * d), penalties, D))
+function BuildPenaltyMatrix(y, x, sp, Basis)
+
+    n = length(y)
+    n_knots = map(x -> length(x.breakpoints), Basis)
+    X = map(BuildBasisMatrix, Basis, x)
+    D = map(BuildDifferenceMatrix, Basis)
+    # Drop one column from X and D for identifiability
+    X = map(DropCol, X, n_knots)
+    D = map(DropCol, D, n_knots)
+
+    # Center
+    ColMeans = map(BuildBasisMatrixColMeans, X)
+    X = map(CenterBasisMatrix, X, ColMeans)
+
+    # Store Coef index
+    CoefIndex = BuildCoefIndex(X)
+
+    Dp = dcat(map((p, d) -> (sqrt(p) * d), sp, D))
     Xi = vcat(
         repeat([1], n),
         repeat([0], size(Dp,1))
     )
     Xp = hcat(Xi, vcat(hcat(X...), Dp))
-    Yp = vcat(gamData.y, repeat([0], size(Dp, 1)))
+    Yp = vcat(y, repeat([0], size(Dp, 1)))
 
-    return Xp, Yp
+    return Xp, Yp, ColMeans, CoefIndex
 end
 
-Xp, Yp = BuildPenaltyMatrix(gamData, penalties)
-
-# Function to estimate GAM Coefs
-function EstimatePenaltyCoef(gamData::GAMData, penalties::AbstractVector)
-    Xp, Yp = BuildPenaltyMatrix(gamData, penalties)
-    B = Xp \ Yp
-    return B
-end
-
-B = EstimatePenaltyCoef(gamData, penalties)
-
-# Function to calculate GCV for given penalty
-function GCV(gamData::GAMData, penalties::AbstractVector)
-    n = length(gamData.y) # number of observations
-    Xp, Yp = BuildPenaltyMatrix(gamData, penalties)
-    B = Xp \ Yp
-    H = Xp * pinv(Xp' * Xp) * Xp' # hat matrix
+function ModelDiagnostics(y, y_hat, X)
+    n = length(y)
+    H = X * pinv(X' * X) * X' # hat matrix
     trF = sum(diag(H)[1:n]) # EDF
-    y_hat = Xp * B # predictions
-    rsd = gamData.y - y_hat[1:n] # residuals
+    rsd = y - y_hat # residuals
     rss = sum(rsd.^2) # residual SS
     sig_hat = rss/(n-trF) # residual variance
     gcv = sig_hat*n/(n-trF) # GCV score
-    return gcv
+
+    return Dict(
+        "RSS" => rss,
+        "EDF" => trF,
+        "GCV" => gcv
+    )
 end
 
-GCV(gamData, penalties)
+# function FitOLS(y, x, sp, Basis)
 
-rho = range(-9, 11)
+#     n = length(y)
+#     Xp, Yp, ColMeans, CoefIndex = BuildPenaltyMatrix(y, x, sp, Basis)
+#     B = Xp \ Yp
+#     y_hat = (Xp * B)[1:n]
+#     diagnostics = ModelDiagnostics(y, y_hat, Xp)
+
+#     return GAMData(
+#         y,
+#         x,
+#         Basis,
+#         Families["Normal"],
+#         B,
+#         ColMeans,
+#         CoefIndex,
+#         y_hat,
+#         diagnostics
+#     )
+# end
+#
+# FitOLS(y, x, [2, 2], Basis).Diagnostics["GCV"]
+
+function FitWPS(y, x, sp, Basis, w = ones(length(y)))
+
+    n = length(y)
+    w = sqrt.(w)
+    yw = w .* y
+    Xp, Yp, ColMeans, CoefIndex = BuildPenaltyMatrix(yw, x, sp, Basis)
+    B = Xp \ Yp
+    y_hat = (Xp * B)[1:n]
+    diagnostics = ModelDiagnostics(y, y_hat, Xp)
+
+    return GAMData(
+        y,
+        x,
+        Basis,
+        Families["Normal"],
+        B,
+        ColMeans,
+        CoefIndex,
+        y_hat,
+        diagnostics
+    )
+end
+
+FitWPS(y, x, [2, 2], Basis).Diagnostics["GCV"]
+
+rho = range(-20, 11)
 out = []
 for i in eachindex(rho)
-    push!(out, GCV(gamData, repeat([exp(rho[i])], length(gamData.x))))
+    mod = FitWPS(y, x,repeat([exp(rho[i])], length(x)), Basis)
+    push!(out, mod.Diagnostics["GCV"])
 end
 plot(rho, out)
 
-function OptimizePenaltyGCV(gamData::GAMData)
-    initial = zeros(length(gamData.x))
-    res = optimize(x -> GCV(gamData, exp.(x)), initial, NelderMead())
-    return exp.(Optim.minimizer(res))
+
+function GAMFit(y, x, sp, Basis, Family)
+    eta = Family["Link"].(y)
+    old_gcv = -100
+    for i in 1:25
+        mu = Family["InverseLink"].(eta)
+        z = (y .- mu) ./ mu .+ eta
+        global mod = FitWPS(z, x, sp, Basis)
+
+        if abs(mod.Diagnostics["GCV"] - old_gcv) < 1e-5*mod.Diagnostics["GCV"]
+            break
+        end
+        old_gcv = mod.Diagnostics["GCV"]
+        eta = mod.Fitted
+    end
+    mod.Family = Family
+    mod.Fitted = Family["InverseLink"].(mod.Fitted)
+    return mod
 end
 
-optim_penalty = OptimizePenaltyGCV(gamData)
 
-function setPenalty!(gamData::GAMData, Penalty::AbstractArray)
-    setfield!(gamData, :Penalty, Penalty)
+function PIRLS(y, x, sp, Basis, Family)
+    
+    mu = y
+    eta = Family["Link"].(mu)
+    
+    logLik = sum(map(x -> logpdf(Family["Distribution"](x), x), y))
+    dev = logLik
+    for i in 1:25
+        z = @. (y - mu) / mu + eta
+        #w = mu
+        w = ones(length(mu))
+        global mod = FitWPS(z, x, sp, Basis, w)
+        eta = mod.Fitted
+        mu = Family["InverseLink"].(eta)
+        oldDev = dev
+        dev = 2 * (logLik - sum(map((x,y) -> logpdf(Family["Distribution"](x), y), mu, y)))
+        if abs(dev - oldDev) < 1e-6 * dev
+            break
+        end
+    end
+    mod.Family = Family
+    mod.Fitted = Family["InverseLink"].(mod.Fitted)
+    return mod
 end
 
-setPenalty!(gamData, optim_penalty)
+# 0.01014639;
+sp = [1,1]
+GAMFit(y, x, sp, Basis, Families["Gamma"]).Diagnostics["GCV"]
 
-function setCoef!(gamData::GAMData, Coef::AbstractVector)
-    setfield!(gamData, :Coef, Coef)
-    setfield!(gamData, :Fit, true)
+PIRLS(y, x, sp, Basis, Families["Gamma"]).Diagnostics["GCV"]
+
+rho = range(-20, 11)
+out = []
+for i in eachindex(rho)
+    mod = PIRLS(y, x, repeat([exp(rho[i])], length(x)), Basis, Families["Gamma"])
+    push!(out, mod.Diagnostics["GCV"])
+end
+plot(rho, out)
+
+
+# looking for  8.528943 246888083.011660
+function GAMFitGCV(y, x, Basis, Family)
+    res = optimize(sp -> PIRLS(y, x, exp.(sp), Basis, Family).Diagnostics["GCV"], zeros(length(x)), NelderMead())
+    exp.(Optim.minimizer(res))
 end
 
-optim_coef = EstimatePenaltyCoef(gamData, optim_penalty)
+modsp = GAMFitGCV(y, x, Basis, Families["Gamma"])
+mod = GAMFit(y, x, modsp, Basis, Families["Gamma"])
 
-setCoef!(gamData, optim_coef)
 
-function FitGAM(y::AbstractArray, x::AbstractArray, BasisArgs::Array{Tuple{Int,Int}})
-    gamData = GAMData(y::AbstractArray, x::AbstractArray, BasisArgs::Array{Tuple{Int,Int}})
-    penalties = OptimizePenaltyGCV(gamData)
-    gamCoef = EstimatePenaltyCoef(gamData, penalties)
-    setPenalty!(gamData, penalties)
-    setCoef!(gamData, gamCoef)
-    return gamData
+function BuildPredictionMatrix(x::AbstractArray, Basis::BSplineBasis, ColMeans::AbstractArray)
+    basisMatrix = DropCol(BuildBasisMatrix(Basis, x), length(Basis.breakpoints))
+    return CenterBasisMatrix(basisMatrix, ColMeans)
 end
 
-gamData = FitGAM(y, x, BasisArgs)
+test = BuildPredictionMatrix(x[1], Basis[1], mod.ColMeans[1])
 
-function BuildPredictionMatrix(gamData::GAMData, idx::Int, values::AbstractArray)
-    # need to assert model is Fit
-    @assert gamData.Fit
-    basis = gamData.Basis[idx]
-    colMeans = gamData.BasisMatrixColMeans[idx]
-    basisMatrix = BuildBasisMatrix(basis, values)
-    return CenterBasisMatrix(basisMatrix, colMeans)
-end
-
-function PredictPartial(gamData::GAMData, idx::Int, values::AbstractArray)
-    predMatrix = BuildPredictionMatrix(gamData, idx, values)
-    predBeta = gamData.Coef[gamData.CoefIndex[idx]]
+function PredictPartial(mod, ix)
+    predMatrix = BuildPredictionMatrix(mod.x[ix], mod.Basis[ix], mod.ColMeans[ix])
+    predBeta = mod.Coef[mod.CoefIndex[ix]]
     return predMatrix * predBeta
 end
 
-function PartialDependencePlot(gamData::GAMData, idx::Int)
-    values = gamData.x[idx]
-    sort!(values)
-    pred = PredictPartial(gamData, idx, values)
-    return plot(values, pred)
+PredictPartial(mod, 1)
+
+
+function PartialDependencePlot(mod, ix)
+    x = mod.x[ix]
+    pred = PredictPartial(mod, ix)
+    ord = sortperm(x)
+    return plot(x[ord], pred[ord])
 end
 
-function plotGAM(gamData::GAMData)
-    partialPlot = map(x -> PartialDependencePlot(gamData, x), eachindex(gamData.x))
+PartialDependencePlot(mod, 2)
+
+function plotGAM(mod)
+    partialPlot = map(x -> PartialDependencePlot(mod, x), eachindex(mod.x))
     plot(partialPlot..., layout=(1, length(partialPlot)), link = :y)
 end
 
-plotGAM(gamData)
+plotGAM(mod)
