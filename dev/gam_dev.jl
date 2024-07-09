@@ -3,6 +3,7 @@ using DataFrames, CSV, Plots, Optim
 
 identity(x) = x
 logit(p) = log(p/(1-p))
+expit(x) = 1/(1+exp(-x))
 
 # df = CSV.read("dev/engine.csv", DataFrame)
 # y = df.wear; x = [df.size]
@@ -14,24 +15,44 @@ y = df.Volume
 sp = [2,2]
 BasisArgs = [(10, 2), (10,2)]
 
-Families = Dict(
-    "Normal" => Dict(
-        "Name" => "Normal",
-        "Distribution" => Normal,
-        "Link" => identity,
-        "InverseLink" => identity
+Links = Dict(
+    :Identity => Dict(
+        :Name => "Identity",
+        :Function => identity,
+        :Inverse => identity,
+        :Derivative => (x -> 1),
+        :Second_Derivative => (x -> 0)
     ),
-    "Gamma" => Dict(
-        "Name" => "Gamma",
-        "Distribution" => Gamma,
-        "Link" => log,
-        "InverseLink" => exp
+    :Log => Dict(
+        :Name => "Log",
+        :Function => log,
+        :Inverse => exp,
+        :Derivative => (x -> 1/x),
+        :Second_Derivative => (x -> -1/(x^2))
+    )
+)
+
+Dists = Dict(
+    :Normal => Dict(
+        :Name => "Normal",
+        :Distribution => Normal,
+        :V => (mu -> 1),
+        :V_Derivative => (mu -> 0),
+        :Link => Links[:Identity]
     ),
-    "Poisson" => Dict(
-        "Name" => "Poisson",
-        "Distribution" => Poisson,
-        "Link" => log,
-        "InverseLink" => exp
+    :Gamma => Dict(
+        :Name => "Gamma",
+        :Distribution => Gamma,
+        :V => (mu -> mu^2),
+        :V_Derivative => (mu -> 2*mu),
+        :Link => Links[:Log]
+    ),
+    :Poisson => Dict(
+        :Name => "Poisson",
+        :Distribution => Poisson,
+        :V => (mu -> mu),
+        :V_Derivative => (mu -> 1),
+        :Link => Links[:Log]
     )
 )
 
@@ -39,7 +60,8 @@ mutable struct GAMData
     y::AbstractArray
     x::AbstractArray
     Basis::AbstractArray{BSplineBasis}
-    Family::Dict
+    Dist::Dict
+    Link::Dict
     Coef::AbstractArray
     ColMeans::AbstractArray
     CoefIndex::AbstractArray
@@ -50,14 +72,15 @@ mutable struct GAMData
         y::AbstractArray,
         x::AbstractArray,
         Basis::AbstractArray,
-        Family::Dict,
+        Dist::Dict,
+        Link::Dict,
         Coef::AbstractArray,
         ColMeans::AbstractArray,
         CoefIndex::AbstractArray,
         Fitted::AbstractArray,
         Diagnostics::Dict
     )
-        new(y, x, Basis, Family, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
+        new(y, x, Basis, Dist, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
     end
 end
 
@@ -72,7 +95,6 @@ function BuildQuantileBasis(x::Vector, n_knots::Int64, order::Int64)
     Basis = BSplineBasis(order, KnotsList);
     return Basis
 end
-
 
 Basis = map((xi, argi) -> BuildUniformBasis(xi, argi[1], argi[2]), x, BasisArgs)
 
@@ -180,159 +202,192 @@ function BuildPenaltyMatrix(y, x, sp, Basis)
     # Store Coef index
     CoefIndex = BuildCoefIndex(X)
 
-    Dp = dcat(map((p, d) -> (sqrt(p) * d), sp, D))
-    Xi = vcat(
-        repeat([1], n),
-        repeat([0], size(Dp,1))
-    )
-    Xp = hcat(Xi, vcat(hcat(X...), Dp))
-    Yp = vcat(y, repeat([0], size(Dp, 1)))
+    # Build Design Matrix
+    X = hcat(repeat([1],n), hcat(X...)) # add intercept
 
-    return Xp, Yp, ColMeans, CoefIndex
+    # Build Penalty Matrix
+    D = dcat(map((p, d) -> (sqrt(p) * d), sp, D))
+    D = hcat(repeat([0], size(D,1)), D) # add 0 for intercept
+
+    return X, y, D, ColMeans, CoefIndex
 end
 
-function ModelDiagnostics(y, y_hat, X)
+function HatMatrix(X, D, W)
+    return W * (X * inv(X' * W * X + D' * D) ) * X'
+end
+
+function ModelDiagnostics(y, X, D, W, B)
     n = length(y)
-    H = X * pinv(X' * X) * X' # hat matrix
+    H = HatMatrix(X, D, W) # hat matrix
     trF = sum(diag(H)[1:n]) # EDF
-    rsd = y - y_hat # residuals
+    rsd = y - (X * B) # residuals
     rss = sum(rsd.^2) # residual SS
     sig_hat = rss/(n-trF) # residual variance
     gcv = sig_hat*n/(n-trF) # GCV score
 
     return Dict(
-        "RSS" => rss,
-        "EDF" => trF,
-        "GCV" => gcv
+        :RSS => rss,
+        :EDF => trF,
+        :GCV => gcv
     )
 end
 
-# function FitOLS(y, x, sp, Basis)
-
-#     n = length(y)
-#     Xp, Yp, ColMeans, CoefIndex = BuildPenaltyMatrix(y, x, sp, Basis)
-#     B = Xp \ Yp
-#     y_hat = (Xp * B)[1:n]
-#     diagnostics = ModelDiagnostics(y, y_hat, Xp)
-
-#     return GAMData(
-#         y,
-#         x,
-#         Basis,
-#         Families["Normal"],
-#         B,
-#         ColMeans,
-#         CoefIndex,
-#         y_hat,
-#         diagnostics
-#     )
-# end
-#
-# FitOLS(y, x, [2, 2], Basis).Diagnostics["GCV"]
-
-function FitWPS(y, x, sp, Basis, w = ones(length(y)))
+function FitOLS(y, x, sp, Basis)
 
     n = length(y)
-    w = sqrt.(w)
-    yw = w .* y
-    Xp, Yp, ColMeans, CoefIndex = BuildPenaltyMatrix(yw, x, sp, Basis)
+    X, Y, D, ColMeans, CoefIndex = BuildPenaltyMatrix(y, x, sp, Basis)
+
+    Xp = vcat(X, D)
+    Yp = vcat(y, repeat([0], size(D,1)))
     B = Xp \ Yp
-    y_hat = (Xp * B)[1:n]
-    diagnostics = ModelDiagnostics(y, y_hat, Xp)
+    fitted = (Xp * B)[1:n]
+    diagnostics = ModelDiagnostics(y, X, D, Diagonal(ones(n)), B)
 
     return GAMData(
         y,
         x,
         Basis,
-        Families["Normal"],
+        Dists[:Normal],
+        Links[:Identity],
         B,
         ColMeans,
         CoefIndex,
-        y_hat,
+        fitted,
         diagnostics
     )
 end
 
-FitWPS(y, x, [2, 2], Basis).Diagnostics["GCV"]
+FitOLS(y, x, [2, 2], Basis).Diagnostics[:GCV]
 
-rho = range(-20, 11)
-out = []
-for i in eachindex(rho)
-    mod = FitWPS(y, x,repeat([exp(rho[i])], length(x)), Basis)
-    push!(out, mod.Diagnostics["GCV"])
+function FitWPS(y, x, sp, Basis, w = ones(length(y)))
+
+    X, Y, D, ColMeans, CoefIndex = BuildPenaltyMatrix(y, x, sp, Basis)
+    W = Diagonal(w)
+    # Left-hand side (LHS) matrix
+    LHS = X' * W * X + D' * D
+    # Right-hand side (RHS) vector
+    RHS = X' * W * Y
+    # Solve for beta
+    B = LHS \ RHS
+    # Fitted values
+    fitted = (X * B)
+    # Run Diagnostics
+    diagnostics = ModelDiagnostics(y, X, D, W, B)
+
+    return GAMData(
+        y,
+        x,
+        Basis,
+        Dists[:Normal],
+        Links[:Identity],
+        B,
+        ColMeans,
+        CoefIndex,
+        fitted,
+        diagnostics
+    )
 end
-plot(rho, out)
+
+# Coef the same
+plot(
+    FitOLS(y, x, [2,2], Basis).Coef,
+    FitWPS(y, x, [2, 2], Basis).Coef
+)
+
+# GCV the same
+FitOLS(y, x, [2,2], Basis).Diagnostics[:GCV]
+FitWPS(y, x, [2, 2], Basis).Diagnostics[:GCV] # no weights should return same as OLS
 
 
-function GAMFit(y, x, sp, Basis, Family)
-    eta = Family["Link"].(y)
-    old_gcv = -100
-    for i in 1:25
-        mu = Family["InverseLink"].(eta)
-        z = (y .- mu) ./ mu .+ eta
-        global mod = FitWPS(z, x, sp, Basis)
+# # Deprecated -> use PIRLS now
+# function GAMFit(y, x, sp, Basis, Dist, Link)
+#     eta = Link[:Function].(y)
+#     old_gcv = -100
+#     for i in 1:25
+#         mu = Link[:Inverse].(eta)
+#         z = (y .- mu) ./ mu .+ eta
+#         global mod = FitOLS(z, x, sp, Basis)
 
-        if abs(mod.Diagnostics["GCV"] - old_gcv) < 1e-5*mod.Diagnostics["GCV"]
-            break
-        end
-        old_gcv = mod.Diagnostics["GCV"]
-        eta = mod.Fitted
-    end
-    mod.Family = Family
-    mod.Fitted = Family["InverseLink"].(mod.Fitted)
-    return mod
+#         if abs(mod.Diagnostics[:GCV] - old_gcv) < 1e-5*mod.Diagnostics[:GCV]
+#             break
+#         end
+#         old_gcv = mod.Diagnostics[:GCV]
+#         eta = mod.Fitted
+#     end
+#     mod.Dist = Dist
+#     mod.Fitted = Link[:Inverse].(mod.Fitted)
+#     return mod
+# end
+
+
+function alpha(y, mu, Dist, Link)
+    "see page 250 in Wood, 2nd ed"
+    return @. 1 + (y - mu) * (
+        Dist[:V_Derivative](mu) / Dist[:V](mu) + 
+        Link[:Second_Derivative](mu) / Link[:Derivative](mu)
+    )
 end
 
-
-function PIRLS(y, x, sp, Basis, Family)
+function PIRLS(y, x, sp, Basis, Dist, Link, maxIter = 25, tol = 1e-6)
     
+    # Initial Predictions
+    n = length(y)
     mu = y
-    eta = Family["Link"].(mu)
+    eta = Link[:Function].(mu)
     
-    logLik = sum(map(x -> logpdf(Family["Distribution"](x), x), y))
+    # Deviance
+    logLik = sum(map(x -> logpdf(Dist[:Distribution](x), x), y))
     dev = logLik
-    for i in 1:25
-        z = @. (y - mu) / mu + eta
-        #w = mu
-        w = ones(length(mu))
+    for i in 1:maxIter
+        # Compute weights
+        a = alpha(y, mu, Dist, Link)
+        z = @. Link[:Derivative](mu) * (y - mu) / a + eta
+        w = @. a / (Link[:Derivative](mu)^2 * Dist[:V](mu))
+
         global mod = FitWPS(z, x, sp, Basis, w)
         eta = mod.Fitted
-        mu = Family["InverseLink"].(eta)
+        mu = Link[:Inverse].(eta)
         oldDev = dev
-        dev = 2 * (logLik - sum(map((x,y) -> logpdf(Family["Distribution"](x), y), mu, y)))
+        dev = 2 * (logLik - sum(map((x,y) -> logpdf(Dist[:Distribution](x), y), mu, y)))
         if abs(dev - oldDev) < 1e-6 * dev
             break
         end
     end
-    mod.Family = Family
-    mod.Fitted = Family["InverseLink"].(mod.Fitted)
+    mod.Dist = Dist
+    mod.Fitted = Link[:Inverse].(mod.Fitted)
     return mod
 end
 
-# 0.01014639;
-sp = [1,1]
-GAMFit(y, x, sp, Basis, Families["Gamma"]).Diagnostics["GCV"]
 
-PIRLS(y, x, sp, Basis, Families["Gamma"]).Diagnostics["GCV"]
+# 0.01014639 from R code;
+sp = [1,1]
+mod = PIRLS(y, x, sp, Basis, Dists[:Gamma], Links[:Log])
+mod.Diagnostics[:GCV] # Diff fitting method -> close enough for comfort
+
 
 rho = range(-20, 11)
 out = []
 for i in eachindex(rho)
-    mod = PIRLS(y, x, repeat([exp(rho[i])], length(x)), Basis, Families["Gamma"])
-    push!(out, mod.Diagnostics["GCV"])
+    mod = PIRLS(y, x, repeat([exp(rho[i])],length(x)), Basis, Dists[:Gamma], Links[:Log])
+    push!(out, mod.Diagnostics[:GCV])
 end
 plot(rho, out)
 
 
 # looking for  8.528943 246888083.011660
-function GAMFitGCV(y, x, Basis, Family)
-    res = optimize(sp -> PIRLS(y, x, exp.(sp), Basis, Family).Diagnostics["GCV"], zeros(length(x)), NelderMead())
-    exp.(Optim.minimizer(res))
+function OptimPIRLS(y, x, Basis, Dist, Link)
+    # Find Optimal Smoothing Params
+    res = optimize(
+        sp -> PIRLS(y, x, exp.(sp), Basis, Dist, Link).Diagnostics[:GCV], 
+        zeros(length(x)), 
+        NelderMead()
+    )
+    sp = exp.(Optim.minimizer(res))
+    # Fit Optimal Model
+    return PIRLS(y, x, sp, Basis, Dist, Link)
 end
 
-modsp = GAMFitGCV(y, x, Basis, Families["Gamma"])
-mod = GAMFit(y, x, modsp, Basis, Families["Gamma"])
-
+mod = OptimPIRLS(y, x, Basis, Dists[:Gamma], Links[:Log])
 
 function BuildPredictionMatrix(x::AbstractArray, Basis::BSplineBasis, ColMeans::AbstractArray)
     basisMatrix = DropCol(BuildBasisMatrix(Basis, x), length(Basis.breakpoints))
