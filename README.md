@@ -10,15 +10,16 @@ Fit, evaluate, and visualise generalised additive models (GAMs) in native Julia
 The basic interface to `GAM.jl` is the `FitGAM` function, which is as easy as:
 
 ```{julia}
-mod = FitGAM(y, X, Dists[:Gamma], Links[:Log])
+mod = FitGAM(y, x, Dists[:Gamma], Links[:Log], [(10, 2), (10, 2)])
 ```
 
-where `Dists` is a Dictionary of available likelihood families and `Links` is a Dictionary of link functions that can be used for each likelihood.
+where `Dists` is a Dictionary of available likelihood families and `Links` is a Dictionary of link functions that can be used for each likelihood. In this example, `X` is comprised of two covariates and we are specifying 10 knots and a polynomial order of 2 for the splines for both.
 
 Users can also control the penalised iteratively reweighted least squares algorithm directly:
 
 ```{julia}
-mod = FitGAM(y, X, Dists[:Gamma], Links[:Log];
+mod = FitGAM(mod = FitGAM(y, x, Dists[:Gamma], 
+             Links[:Log], [(10, 2), (10, 2)]);
              Optimizer = NelderMead(), maxIter = 1e5,
              tol = 1e-6)
 ```
