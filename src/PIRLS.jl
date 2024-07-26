@@ -8,7 +8,7 @@ PIRLS(y, x, sp, Basis, Dist, Link; maxIter, tol)
 ```
 Arguments:
 - `y` : `Vector` containing the response variable.
-- `x` : `Vector` of input data.
+- `x` : `Array` of input data.
 - `sp` : `Float` of the optimised smoothing parameter.
 - `Basis` : `AbstractArray` containing the basis matrix.
 - `Dist` : Likelihood distribution.
@@ -58,7 +58,7 @@ OptimPIRLS(y, x, Basis, Dist, Link; Optimizer)
 ```
 Arguments:
 - `y` : `Vector` containing the response variable.
-- `x` : `Vector` of input data.
+- `x` : `Array` of input data.
 - `Basis` : `AbstractArray` containing the basis matrix.
 - `Dist` : Likelihood distribution.
 - `Link` : Link function.
