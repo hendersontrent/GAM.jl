@@ -1,33 +1,27 @@
 module GAM
 
-using Random, FillArrays, DataFrames, Distributions, StatsPlots, GLM, Optim, BSplines, LinearAlgebra
+using Distributions, GLM, Optim, BSplines, LinearAlgebra, DataFrames, Plots, Optim
 
-include("QuantileBasis.jl")
-include("BasisMatrix.jl")
+include("Links-Dists.jl")
+include("GAMData.jl")
+include("BuildBasis.jl")
 include("diffm.jl")
 include("DifferenceMatrix.jl")
-include("PenaltyMatrix.jl")
-include("GCV.jl")
-include("OptimizeGCVLambda.jl")
-include("ParseFormula.jl")
-include("SmoothData.jl")
-include("GAMModel.jl")
-include("gam_fit.jl")
-include("PlotSmooth.jl")
+include("dcat.jl")
+include("ModelDiagnostics.jl")
+include("FitOLS.jl")
+include("FitWPS.jl")
+include("alpha.jl")
+include("PIRLS.jl")
+include("Predictions.jl")
+include("Plots.jl")
+include("FitGAM.jl")
 
-export QuantileBasis
-export BasisMatrix
-export diffm
-export DifferenceMatrix
-export PenaltyMatrix
-export GCV
-export OptimizeGCVLambda
-export GAMModel
-export PlotSmooth
-export GAMFormula
-export ParseFormula
-export SmoothData
-export NoSmoothData
-export gam
+export Links
+export Dists
+export GAMData
+export PartialDependencePlot
+export plotGAM
+export FitGAM
 
 end
