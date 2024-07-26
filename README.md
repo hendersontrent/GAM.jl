@@ -18,7 +18,9 @@ where `Dists` is a Dictionary of available likelihood families and `Links` is a 
 Users can also control the penalised iteratively reweighted least squares algorithm directly:
 
 ```{julia}
-mod = FitGAM(y, X, Dists[:Gamma], Links[:Log]; Optimizer = NelderMead(), maxIter = 1e5, tol = 1e-6)
+mod = FitGAM(y, X, Dists[:Gamma], Links[:Log];
+             Optimizer = NelderMead(), maxIter = 1e5,
+             tol = 1e-6)
 ```
 
 Note that this current interface is not as elegant as the formula-driven `gam` function in R's `mgcv` package -- this aspect of `GAM.jl` is a work-in-progress (it's tricky to get user-specified smooths down!).
