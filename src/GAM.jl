@@ -16,12 +16,13 @@ include("PIRLS.jl")
 include("Predictions.jl")
 include("Plots.jl")
 include("FitGAM.jl")
+include("GAMFormula.jl")
 
 export Links
 export Dists
 export GAMData
 export PartialDependencePlot
 export plotGAM
-export FitGAM
+export gam
 
 end

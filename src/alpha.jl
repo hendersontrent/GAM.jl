@@ -8,6 +8,7 @@ alpha((y, mu, Dist, Link)
 ```
 Arguments:
 - `y` : `Vector` containing the response variable.
+- `mu` : mean.
 - `Dist` : Likelihood distribution.
 - `Link` : Link function.
 """
