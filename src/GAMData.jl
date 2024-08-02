@@ -1,16 +1,16 @@
 """
-    GAMData(x, y, Basis, Dist, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
+    GAMData(x, y, Basis, Family, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
 Holds information relevant to the final fitted GAM model.
 
 Usage:
 ```julia-repl
-GAMData(x, y, Basis, Dist, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
+GAMData(x, y, Basis, Family, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
 ```
 Arguments:
 - `x` : `AbstractArray` of input data.
 - `y` : `AbstractArray` for the response variable.
 - `Basis` : `AbstractArray` of the basis Matrix.
-- `Dist` : `Dict` of the likelihood distribution.
+- `Family` : `Dict` of the likelihood distribution.
 - `Link` : `Dict` of link function.
 - `Coef` : `AbstractArray` of coefficients.
 - `ColMeans` : `AbstractArray` of column means.
@@ -22,7 +22,7 @@ mutable struct GAMData
     y::AbstractArray
     x::AbstractArray
     Basis::AbstractArray{BSplineBasis}
-    Dist::Dict
+    Family::Dict
     Link::Dict
     Coef::AbstractArray
     ColMeans::AbstractArray
@@ -34,7 +34,7 @@ mutable struct GAMData
         y::AbstractArray,
         x::AbstractArray,
         Basis::AbstractArray,
-        Dist::Dict,
+        Family::Dict,
         Link::Dict,
         Coef::AbstractArray,
         ColMeans::AbstractArray,
@@ -42,6 +42,6 @@ mutable struct GAMData
         Fitted::AbstractArray,
         Diagnostics::Dict
     )
-        new(y, x, Basis, Dist, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
+        new(y, x, Basis, Family, Link, Coef, ColMeans, CoefIndex, Fitted, Diagnostics)
     end
 end

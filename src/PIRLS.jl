@@ -33,17 +33,17 @@ function PIRLS(y, x, sp, Basis, Dist, Link; maxIter = 25, tol = 1e-6)
         z = @. Link[:Derivative](mu) * (y - mu) / a + eta
         w = @. a / (Link[:Derivative](mu)^2 * Dist[:V](mu))
 
-        global mod = FitWPS(z, x, sp, Basis, w)
+        global mod = FitWPS(z, x, sp, Basis, Dist, Link, w)
         eta = mod.Fitted
         mu = Link[:Inverse].(eta)
         oldDev = dev
         dev = 2 * (logLik - sum(map((x,y) -> logpdf(Dist[:Distribution](x), y), mu, y)))
-        if abs(dev - oldDev) < 1e-6 * dev
+        if abs(dev - oldDev) < tol * dev
             break
         end
     end
 
-    mod.Dist = Dist
+    #mod.Family = Dist
     mod.Fitted = Link[:Inverse].(mod.Fitted)
     return mod
 end

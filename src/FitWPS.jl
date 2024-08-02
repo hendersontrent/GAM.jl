@@ -1,18 +1,20 @@
 """
-    FitWPS(y, x, sp, Basis, w)
+    FitWPS(y, x, sp, Basis, Dist, Link, w)
 Fit WPS model.
 
 Usage:
 ```julia-repl
-FitWPS(y, x, sp, Basis, w)
+FitWPS(y, x, sp, Basis, Dist, Link, w)
 ```
 Arguments:
 - `y` : `Vector` containing the response variable.
 - `x` : `Vector` of input data.
-- `sp` : `xxx` xx.
-- `Basis` : `AbstractArray` containing the basis matrix.
+- `sp` : `Float` of the optimised smoothing parameter.
+- `Dist` : Likelihood distribution.
+- `Link` : Link function.
+- `w` : `Vector` of weights.
 """
-function FitWPS(y, x, sp, Basis, w = ones(length(y)))
+function FitWPS(y, x, sp, Basis, Dist, Link, w = ones(length(y)))
 
     X, Y, D, ColMeans, CoefIndex = BuildPenaltyMatrix(y, x, sp, Basis)
     W = Diagonal(w)
@@ -31,8 +33,8 @@ function FitWPS(y, x, sp, Basis, w = ones(length(y)))
         y,
         x,
         Basis,
-        Dists[:Normal],
-        Links[:Identity],
+        Dist,
+        Link,
         B,
         ColMeans,
         CoefIndex,

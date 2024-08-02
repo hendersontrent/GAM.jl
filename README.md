@@ -7,24 +7,23 @@ Fit, evaluate, and visualise generalised additive models (GAMs) in native Julia
 
 ## Usage
 
-The basic interface to `GAM.jl` is the `FitGAM` function, which is as easy as:
+The basic interface to `GAM.jl` is the `gam` function, which is as easy as:
 
 ```{julia}
-mod = FitGAM(y, x, Dists[:Gamma], Links[:Log], [(10, 2), (10, 2)])
+    mod = gam("Volume ~ s(Girth, k=10, degree=3) + s(Height, k=10, degree=3)", df)
 ```
 
-where `Dists` is a Dictionary of available likelihood families and `Links` is a Dictionary of link functions that can be used for each likelihood. In this example, `X` is comprised of two covariates and we are specifying 10 knots and a polynomial order of 2 for the splines for both.
+by default, `gam` uses a Normal likliehood and the identity link function. In this example, `df` is the `trees` dataset included in R and in Julia through the [`RDatasets`](https://github.com/JuliaStats/RDatasets.jl) package. We are using two covariates in `df` -- `Girth` and `Height` -- and we are specifying 10 knots and a polynomial order of 3 for the splines for both. Note the similarity between the formula specification and that used by `mgcv` in R. Unfortunately, we have not yet solved a symbolic way to represent the formula using a macro instead of a string, but hopefully this will be come in the near future!
 
-Users can also control the penalised iteratively reweighted least squares algorithm directly:
+Users can also control the penalised iteratively reweighted least squares algorithm directly, as well as change the likelihood family and link function:
 
 ```{julia}
-mod = FitGAM(mod = FitGAM(y, x, Dists[:Gamma], 
-             Links[:Log], [(10, 2), (10, 2)]);
-             Optimizer = NelderMead(), maxIter = 1e5,
-             tol = 1e-6)
+mod = gam("Volume ~ s(Girth, k=10, degree=3) + s(Height, k=10, degree=3)",        df; Family = Dists[:Gamma], Link = Links[:Log], 
+          Optimizer = NelderMead(), maxIter = 1e5,
+          tol = 1e-6)
 ```
 
-Note that this current interface is not as elegant as the formula-driven `gam` function in R's `mgcv` package -- this aspect of `GAM.jl` is a work-in-progress (it's tricky to get user-specified smooths down!).
+where `Dists` is a Dictionary of available likelihood families and `Links` is a Dictionary of link functions that can be used for each likelihood (both are included by default in `GAM.jl`, and include the relevant functions, inverses, derivatives, and second derivatives).
 
 ## Development notes
 
