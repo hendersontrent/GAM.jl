@@ -18,12 +18,21 @@ by default, `gam` uses a Normal likliehood and the identity link function. In th
 Users can also control the penalised iteratively reweighted least squares algorithm directly, as well as change the likelihood family and link function:
 
 ```{julia}
-mod = gam("Volume ~ s(Girth, k=10, degree=3) + s(Height, k=10, degree=3)",        df; Family = Dists[:Gamma], Link = Links[:Log], 
+mod = gam("Volume ~ s(Girth, k=10, degree=3) + s(Height, k=10, degree=3)",        df; Family = "Gamma", Link = "Log", 
           Optimizer = NelderMead(), maxIter = 1e5,
           tol = 1e-6)
 ```
 
-where `Dists` is a Dictionary of available likelihood families and `Links` is a Dictionary of link functions that can be used for each likelihood (both are included by default in `GAM.jl`, and include the relevant functions, inverses, derivatives, and second derivatives).
+Note that currently, the following families are supported:
+
+* `Normal`
+* `Poisson`
+* `Gamma`
+
+And the following link functions:
+
+* `Identity`
+* `Log`
 
 ## Development notes
 
