@@ -20,6 +20,8 @@ include("GAMFormula.jl")
 
 export Links
 export Dists
+export Dist_Map
+export Link_Map
 export GAMData
 export PartialDependencePlot
 export plotGAM

@@ -2,6 +2,17 @@ identity(x) = x
 logit(p) = log(p/(1-p))
 expit(x) = 1/(1+exp(-x))
 
+Dist_Map = Dict(
+    "Normal" => :Normal,
+    "Poisson" => :Poisson,
+    "Gamma" => :Gamma
+)
+
+Link_Map = Dict(
+    "Identity" => :Identity,
+    "Log" => :Log,
+)
+
 Links = Dict(
     :Identity => Dict(
         :Name => "Identity",
